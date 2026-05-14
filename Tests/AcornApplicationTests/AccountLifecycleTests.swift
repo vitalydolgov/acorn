@@ -86,7 +86,9 @@ struct AccountLifecycleTests {
     func closeFailsOnDeleted() async throws {
         let sut = SUT()
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
-        try await sut.accounts.save(account.deleted())
+        var deleted = account
+        deleted.delete()
+        try await sut.accounts.save(deleted)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.lifecycle.close(accountID: account.id)
@@ -131,7 +133,9 @@ struct AccountLifecycleTests {
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
         try await sut.lifecycle.close(accountID: account.id)
         let closed = try #require(try await sut.accounts.get(id: account.id))
-        try await sut.accounts.save(closed.deleted())
+        var deleted = closed
+        deleted.delete()
+        try await sut.accounts.save(deleted)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.lifecycle.reopen(accountID: account.id)
@@ -186,7 +190,9 @@ struct AccountLifecycleTests {
         let sut = SUT()
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
         let tx = try await sut.transactionCreateUpdate.post(accountID: account.id, amount: 10, date: .today())
-        try await sut.transactions.save(tx.deleted())
+        var deletedTx = tx
+        deletedTx.delete()
+        try await sut.transactions.save(deletedTx)
 
         try await sut.lifecycle.delete(accountID: account.id)
 

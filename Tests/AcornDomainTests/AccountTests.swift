@@ -24,9 +24,11 @@ struct AccountTests {
 
     // MARK: - Update
 
-    @Test("updated rejects empty name")
-    func updatedRejectsEmpty() {
-        let account = Account.make(name: "A", notes: "")!
-        #expect(account.updated(name: "  ", notes: "x") == nil)
+    @Test("update rejects empty name")
+    func updateRejectsEmpty() {
+        var account = Account.make(name: "A", notes: "")!
+        #expect(throws: DomainError.self) {
+            try account.update(name: "  ", notes: "x")
+        }
     }
 }

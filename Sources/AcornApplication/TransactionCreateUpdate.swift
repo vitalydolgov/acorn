@@ -27,20 +27,21 @@ public struct TransactionCreateUpdate: Sendable {
             amount: amount,
             date: date
         ) else {
-            throw ApplicationError.invalidArgument
+            throw ApplicationError.invalidArgument("amount")
         }
         try await transactionRepository.save(transaction)
         return transaction
     }
 
     public func update(transactionID: UUID, amount: Decimal, date: AcornDate) async throws {
-        guard let transaction = try await transactionRepository.get(id: transactionID) else {
+        guard var transaction = try await transactionRepository.get(id: transactionID) else {
             throw ApplicationError.notFound
         }
         guard !transaction.isDeleted else {
             throw ApplicationError.invalidState
         }
-        try await transactionRepository.save(transaction.updated(amount: amount, date: date))
+        transaction.update(amount: amount, date: date)
+        try await transactionRepository.save(transaction)
     }
 
     private func postable(_ accountID: UUID) async throws {

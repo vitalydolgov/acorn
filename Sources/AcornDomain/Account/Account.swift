@@ -2,10 +2,10 @@ import Foundation
 
 public struct Account: Sendable {
     public let id: UUID
-    public let name: String
-    public let notes: String
-    public let isClosed: Bool
-    public let isDeleted: Bool
+    public private(set) var name: String
+    public private(set) var notes: String
+    public private(set) var isClosed: Bool
+    public private(set) var isDeleted: Bool
 
     public static func make(name: String, notes: String) -> Account? {
         guard let name = AccountValidation.normalizedName(name) else { return nil }
@@ -34,54 +34,27 @@ public struct Account: Sendable {
         )
     }
 
-    public func closed() -> Account {
-        Account(
-            id: id,
-            name: name,
-            notes: notes,
-            isClosed: true,
-            isDeleted: isDeleted
-        )
+    public mutating func close() {
+        isClosed = true
     }
 
-    public func reopened() -> Account {
-        Account(
-            id: id,
-            name: name,
-            notes: notes,
-            isClosed: false,
-            isDeleted: isDeleted
-        )
+    public mutating func reopen() {
+        isClosed = false
     }
 
-    public func updated(name: String, notes: String) -> Account? {
-        guard let name = AccountValidation.normalizedName(name) else { return nil }
-        return Account(
-            id: id,
-            name: name,
-            notes: notes,
-            isClosed: isClosed,
-            isDeleted: isDeleted
-        )
+    public mutating func update(name: String, notes: String) throws {
+        guard let normalized = AccountValidation.normalizedName(name) else {
+            throw DomainError.invalidArgument("name")
+        }
+        self.name = normalized
+        self.notes = notes
     }
 
-    public func deleted() -> Account {
-        Account(
-            id: id,
-            name: name,
-            notes: notes,
-            isClosed: isClosed,
-            isDeleted: true
-        )
+    public mutating func delete() {
+        isDeleted = true
     }
 
-    public func undeleted() -> Account {
-        Account(
-            id: id,
-            name: name,
-            notes: notes,
-            isClosed: isClosed,
-            isDeleted: false
-        )
+    public mutating func undelete() {
+        isDeleted = false
     }
 }

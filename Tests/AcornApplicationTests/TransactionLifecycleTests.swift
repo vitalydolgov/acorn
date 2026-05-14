@@ -68,7 +68,9 @@ struct TransactionLifecycleTests {
     func clearFailsOnDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.post(10)
-        try await sut.transactions.save(tx.deleted())
+        var deletedTx = tx
+        deletedTx.delete()
+        try await sut.transactions.save(deletedTx)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.lifecycle.clear(transactionID: tx.id)
@@ -125,7 +127,9 @@ struct TransactionLifecycleTests {
         let tx = try await sut.post(10)
         try await sut.lifecycle.clear(transactionID: tx.id)
         let cleared = try #require(try await sut.transactions.get(id: tx.id))
-        try await sut.transactions.save(cleared.deleted())
+        var deletedTx = cleared
+        deletedTx.delete()
+        try await sut.transactions.save(deletedTx)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.lifecycle.unclear(transactionID: tx.id)
@@ -170,7 +174,9 @@ struct TransactionLifecycleTests {
         let tx = try await sut.post(10)
         try await sut.lifecycle.clear(transactionID: tx.id)
         let cleared = try #require(try await sut.transactions.get(id: tx.id))
-        try await sut.transactions.save(cleared.deleted())
+        var deletedTx = cleared
+        deletedTx.delete()
+        try await sut.transactions.save(deletedTx)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.lifecycle.reconcile(transactionID: tx.id)

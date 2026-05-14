@@ -9,32 +9,36 @@ public struct TransactionLifecycle: Sendable {
     }
 
     public func clear(transactionID: UUID) async throws {
-        let transaction = try await editable(transactionID)
+        var transaction = try await editable(transactionID)
         guard transaction.status == .uncleared else {
             throw ApplicationError.invalidState
         }
-        try await transactionRepository.save(transaction.cleared())
+        transaction.clear()
+        try await transactionRepository.save(transaction)
     }
 
     public func unclear(transactionID: UUID) async throws {
-        let transaction = try await editable(transactionID)
+        var transaction = try await editable(transactionID)
         guard transaction.status == .cleared else {
             throw ApplicationError.invalidState
         }
-        try await transactionRepository.save(transaction.uncleared())
+        transaction.unclear()
+        try await transactionRepository.save(transaction)
     }
 
     public func reconcile(transactionID: UUID) async throws {
-        let transaction = try await editable(transactionID)
+        var transaction = try await editable(transactionID)
         guard transaction.status == .cleared else {
             throw ApplicationError.invalidState
         }
-        try await transactionRepository.save(transaction.reconciled())
+        transaction.reconcile()
+        try await transactionRepository.save(transaction)
     }
 
     public func delete(transactionID: UUID) async throws {
-        let transaction = try await editable(transactionID)
-        try await transactionRepository.save(transaction.deleted())
+        var transaction = try await editable(transactionID)
+        transaction.delete()
+        try await transactionRepository.save(transaction)
     }
 
     private func editable(_ id: UUID) async throws -> Transaction {

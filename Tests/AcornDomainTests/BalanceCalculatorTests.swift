@@ -15,28 +15,31 @@ struct BalanceCalculatorTests {
         Transaction.post(accountID: accountID, amount: -amount, date: today)
     }
 
-    private func cleared(_ tx: Transaction) -> Transaction { tx.cleared() }
-    private func reconciled(_ tx: Transaction) -> Transaction { tx.cleared().reconciled() }
-    private func deleted(_ tx: Transaction) -> Transaction { tx.deleted() }
-
     // MARK: - balance
 
     @Test("balance sums all non-deleted transactions regardless of status")
     func balanceSumsAllNonDeleted() {
+        var clearedDeposit = deposit(50)
+        clearedDeposit.clear()
+        var reconciledDeposit = deposit(25)
+        reconciledDeposit.clear()
+        reconciledDeposit.reconcile()
         let txs = [
-            deposit(100),                  // uncleared
-            cleared(deposit(50)),          // cleared
-            reconciled(deposit(25)),       // reconciled
-            withdraw(30),                  // uncleared, -30
+            deposit(100),
+            clearedDeposit,
+            reconciledDeposit,
+            withdraw(30),
         ]
         #expect(BalanceCalculator.balance(of: txs) == 145)
     }
 
     @Test("balance skips deleted transactions")
     func balanceSkipsDeleted() {
+        var deletedDeposit = deposit(999)
+        deletedDeposit.delete()
         let txs = [
             deposit(100),
-            deleted(deposit(999)),
+            deletedDeposit,
         ]
         #expect(BalanceCalculator.balance(of: txs) == 100)
     }
@@ -50,19 +53,29 @@ struct BalanceCalculatorTests {
 
     @Test("clearedBalance includes cleared and reconciled, excludes uncleared")
     func clearedBalanceIncludesClearedAndReconciled() {
+        var clearedDeposit = deposit(50)
+        clearedDeposit.clear()
+        var reconciledDeposit = deposit(25)
+        reconciledDeposit.clear()
+        reconciledDeposit.reconcile()
         let txs = [
-            deposit(100),                // uncleared, excluded
-            cleared(deposit(50)),
-            reconciled(deposit(25)),
+            deposit(100),
+            clearedDeposit,
+            reconciledDeposit,
         ]
         #expect(BalanceCalculator.clearedBalance(of: txs) == 75)
     }
 
     @Test("clearedBalance skips deleted transactions")
     func clearedBalanceSkipsDeleted() {
+        var clearedDeposit = deposit(50)
+        clearedDeposit.clear()
+        var deletedClearedDeposit = deposit(999)
+        deletedClearedDeposit.clear()
+        deletedClearedDeposit.delete()
         let txs = [
-            cleared(deposit(50)),
-            deleted(cleared(deposit(999))),
+            clearedDeposit,
+            deletedClearedDeposit,
         ]
         #expect(BalanceCalculator.clearedBalance(of: txs) == 50)
     }
@@ -71,32 +84,46 @@ struct BalanceCalculatorTests {
 
     @Test("unclearedBalance only counts uncleared transactions")
     func unclearedBalanceOnlyUncleared() {
+        var clearedDeposit = deposit(50)
+        clearedDeposit.clear()
+        var reconciledDeposit = deposit(25)
+        reconciledDeposit.clear()
+        reconciledDeposit.reconcile()
         let txs = [
-            deposit(100),                // uncleared
-            cleared(deposit(50)),        // excluded
-            reconciled(deposit(25)),     // excluded
-            withdraw(40),                // uncleared, -40
+            deposit(100),
+            clearedDeposit,
+            reconciledDeposit,
+            withdraw(40),
         ]
         #expect(BalanceCalculator.unclearedBalance(of: txs) == 60)
     }
 
     @Test("unclearedBalance skips deleted transactions")
     func unclearedBalanceSkipsDeleted() {
+        var deletedDeposit = deposit(999)
+        deletedDeposit.delete()
         let txs = [
             deposit(100),
-            deleted(deposit(999)),
+            deletedDeposit,
         ]
         #expect(BalanceCalculator.unclearedBalance(of: txs) == 100)
     }
 
     @Test("cleared + uncleared equals total balance")
     func clearedPlusUnclearedEqualsBalance() {
+        var clearedDeposit = deposit(50)
+        clearedDeposit.clear()
+        var reconciledDeposit = deposit(25)
+        reconciledDeposit.clear()
+        reconciledDeposit.reconcile()
+        var deletedDeposit = deposit(999)
+        deletedDeposit.delete()
         let txs = [
             deposit(100),
-            cleared(deposit(50)),
-            reconciled(deposit(25)),
+            clearedDeposit,
+            reconciledDeposit,
             withdraw(30),
-            deleted(deposit(999)),
+            deletedDeposit,
         ]
         let total = BalanceCalculator.balance(of: txs)
         let cleared = BalanceCalculator.clearedBalance(of: txs)

@@ -1,5 +1,5 @@
-public enum ApplicationError: Error, Sendable {
-    case invalidArgument
+public enum ApplicationError: Error, Sendable, Equatable {
+    case invalidArgument(String)
     case notFound
     case invalidState
 }

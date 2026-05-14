@@ -46,7 +46,7 @@ struct AccountCreateUpdateTests {
     func rejectsEmptyName() async throws {
         let sut = SUT()
 
-        await #expect(throws: ApplicationError.invalidArgument) {
+        await #expect(throws: ApplicationError.invalidArgument("name")) {
             _ = try await sut.createUpdate.open(name: "   ", openingBalance: 0)
         }
         #expect(try await sut.accounts.all().isEmpty)
@@ -94,7 +94,9 @@ struct AccountCreateUpdateTests {
     func updateFailsOnDeletedAccount() async throws {
         let sut = SUT()
         let account = try await sut.createUpdate.open(name: "Old", openingBalance: 0)
-        try await sut.accounts.save(account.deleted())
+        var deleted = account
+        deleted.delete()
+        try await sut.accounts.save(deleted)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.createUpdate.update(accountID: account.id, name: "New", notes: "")
@@ -106,7 +108,7 @@ struct AccountCreateUpdateTests {
         let sut = SUT()
         let account = try await sut.createUpdate.open(name: "Old", openingBalance: 0)
 
-        await #expect(throws: ApplicationError.invalidArgument) {
+        await #expect(throws: DomainError.self) {
             try await sut.createUpdate.update(accountID: account.id, name: "   ", notes: "")
         }
         let stored = try await sut.accounts.get(id: account.id)

@@ -35,21 +35,24 @@ public struct AccountLifecycle: Sendable {
         ) {
             try await transactionRepository.save(zeroing)
         }
-        try await accountRepository.save(account.closed())
+        var closed = account
+        closed.close()
+        try await accountRepository.save(closed)
     }
 
     public func reopen(accountID: UUID) async throws {
-        guard let account = try await accountRepository.get(id: accountID) else {
+        guard var account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
         }
         guard !account.isDeleted, account.isClosed else {
             throw ApplicationError.invalidState
         }
-        try await accountRepository.save(account.reopened())
+        account.reopen()
+        try await accountRepository.save(account)
     }
 
     public func delete(accountID: UUID) async throws {
-        guard let account = try await accountRepository.get(id: accountID) else {
+        guard var account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
         }
         guard !account.isDeleted else {
@@ -62,6 +65,7 @@ public struct AccountLifecycle: Sendable {
         guard deletable else {
             throw ApplicationError.invalidState
         }
-        try await accountRepository.save(account.deleted())
+        account.delete()
+        try await accountRepository.save(account)
     }
 }

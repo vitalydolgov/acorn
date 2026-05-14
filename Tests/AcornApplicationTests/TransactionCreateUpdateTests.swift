@@ -67,7 +67,9 @@ struct TransactionCreateUpdateTests {
     @Test("create fails on a closed account")
     func createFailsOnClosedAccount() async throws {
         let sut = try await SUT()
-        try await sut.accounts.save(sut.account.closed())
+        var closed = sut.account
+        closed.close()
+        try await sut.accounts.save(closed)
 
         await #expect(throws: ApplicationError.invalidState) {
             _ = try await sut.createUpdate.post(accountID: sut.account.id, amount: 10, date: Self.today)
@@ -77,7 +79,9 @@ struct TransactionCreateUpdateTests {
     @Test("create fails on a deleted account")
     func createFailsOnDeletedAccount() async throws {
         let sut = try await SUT()
-        try await sut.accounts.save(sut.account.deleted())
+        var deleted = sut.account
+        deleted.delete()
+        try await sut.accounts.save(deleted)
 
         await #expect(throws: ApplicationError.invalidState) {
             _ = try await sut.createUpdate.post(accountID: sut.account.id, amount: 10, date: Self.today)
@@ -112,7 +116,9 @@ struct TransactionCreateUpdateTests {
     func updateFailsOnDeletedTransaction() async throws {
         let sut = try await SUT()
         let tx = try await sut.createUpdate.post(accountID: sut.account.id, amount: 10, date: Self.today)
-        try await sut.transactions.save(tx.deleted())
+        var deletedTx = tx
+        deletedTx.delete()
+        try await sut.transactions.save(deletedTx)
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.createUpdate.update(transactionID: tx.id, amount: 99, date: Self.today)
@@ -124,7 +130,7 @@ struct TransactionCreateUpdateTests {
     @Test("adjust with zero amount fails with invalidArgument")
     func adjustZeroFails() async throws {
         let sut = try await SUT()
-        await #expect(throws: ApplicationError.invalidArgument) {
+        await #expect(throws: ApplicationError.invalidArgument("amount")) {
             _ = try await sut.createUpdate.adjust(accountID: sut.account.id, amount: 0, date: Self.today)
         }
     }

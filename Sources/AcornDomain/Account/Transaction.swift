@@ -3,11 +3,11 @@ import Foundation
 public struct Transaction: Sendable {
     public let id: UUID
     public let accountID: UUID
-    public let amount: Decimal
-    public let date: AcornDate
-    public let status: TransactionStatus
+    public private(set) var amount: Decimal
+    public private(set) var date: AcornDate
+    public private(set) var status: TransactionStatus
     public let kind: TransactionKind
-    public let isDeleted: Bool
+    public private(set) var isDeleted: Bool
 
     public static func post(
         accountID: UUID,
@@ -79,76 +79,29 @@ public struct Transaction: Sendable {
         )
     }
 
-    public func updated(amount: Decimal, date: AcornDate) -> Transaction {
-        Transaction(
-            id: id,
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: status,
-            kind: kind,
-            isDeleted: isDeleted
-        )
+    public mutating func update(amount: Decimal, date: AcornDate) {
+        self.amount = amount
+        self.date = date
     }
 
-    public func deleted() -> Transaction {
-        Transaction(
-            id: id,
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: status,
-            kind: kind,
-            isDeleted: true
-        )
+    public mutating func delete() {
+        isDeleted = true
     }
 
-    public func reconciled() -> Transaction {
-        Transaction(
-            id: id,
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: .reconciled,
-            kind: kind,
-            isDeleted: isDeleted
-        )
+    public mutating func undelete() {
+        isDeleted = false
     }
 
-    public func cleared() -> Transaction {
-        Transaction(
-            id: id,
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: .cleared,
-            kind: kind,
-            isDeleted: isDeleted
-        )
+    public mutating func reconcile() {
+        status = .reconciled
     }
 
-    public func uncleared() -> Transaction {
-        Transaction(
-            id: id,
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: .uncleared,
-            kind: kind,
-            isDeleted: isDeleted
-        )
+    public mutating func clear() {
+        status = .cleared
     }
 
-    public func undeleted() -> Transaction {
-        Transaction(
-            id: id,
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: status,
-            kind: kind,
-            isDeleted: false
-        )
+    public mutating func unclear() {
+        status = .uncleared
     }
 }
 

@@ -24,7 +24,7 @@ public struct AccountCreateUpdate: Sendable {
         openingBalance: Decimal
     ) async throws -> Account {
         guard let account = Account.make(name: name, notes: notes) else {
-            throw ApplicationError.invalidArgument
+            throw ApplicationError.invalidArgument("name")
         }
         try await accountRepository.save(account)
         if let opening = Transaction.starting(
@@ -38,15 +38,13 @@ public struct AccountCreateUpdate: Sendable {
     }
 
     public func update(accountID: UUID, name: String, notes: String) async throws {
-        guard let account = try await accountRepository.get(id: accountID) else {
+        guard var account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
         }
         guard !account.isDeleted else {
             throw ApplicationError.invalidState
         }
-        guard let updated = account.updated(name: name, notes: notes) else {
-            throw ApplicationError.invalidArgument
-        }
-        try await accountRepository.save(updated)
+        try account.update(name: name, notes: notes)
+        try await accountRepository.save(account)
     }
 }
