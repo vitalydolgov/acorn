@@ -7,7 +7,7 @@ public struct Transaction: Sendable {
     public private(set) var date: AcornDate
     public private(set) var status: TransactionStatus
     public let kind: TransactionKind
-    public private(set) var isDeleted: Bool
+    public private(set) var isDeleted: Bool = false
 
     public static func post(
         accountID: UUID,
@@ -20,8 +20,7 @@ public struct Transaction: Sendable {
             amount: amount,
             date: date,
             status: .uncleared,
-            kind: .regular,
-            isDeleted: false
+            kind: .regular
         )
     }
 
@@ -29,16 +28,17 @@ public struct Transaction: Sendable {
         accountID: UUID,
         amount: Decimal,
         date: AcornDate
-    ) -> Transaction? {
-        guard amount != 0 else { return nil }
+    ) throws -> Transaction {
+        guard amount != 0 else {
+            throw DomainError.invalidArgument("amount must be non-zero")
+        }
         return Transaction(
             id: UUID(),
             accountID: accountID,
             amount: amount,
             date: date,
             status: .uncleared,
-            kind: .adjustment,
-            isDeleted: false
+            kind: .adjustment
         )
     }
 
@@ -46,17 +46,52 @@ public struct Transaction: Sendable {
         accountID: UUID,
         amount: Decimal,
         date: AcornDate
-    ) -> Transaction? {
-        guard amount != 0 else { return nil }
+    ) throws -> Transaction {
+        guard amount != 0 else {
+            throw DomainError.invalidArgument("amount must be non-zero")
+        }
         return Transaction(
             id: UUID(),
             accountID: accountID,
             amount: amount,
             date: date,
             status: .cleared,
-            kind: .starting,
-            isDeleted: false
+            kind: .starting
         )
+    }
+
+    public static func transfer(
+        fromAccountID: UUID,
+        toAccountID: UUID,
+        amount: Decimal,
+        date: AcornDate
+    ) throws -> (outflow: Transaction, inflow: Transaction) {
+        guard amount != 0 else {
+            throw DomainError.invalidArgument("amount must be non-zero")
+        }
+        guard fromAccountID != toAccountID else {
+            throw DomainError.invalidArgument("source and destination must differ")
+        }
+        let outflowID = UUID()
+        let inflowID = UUID()
+        let magnitude = abs(amount)
+        let outflow = Transaction(
+            id: outflowID,
+            accountID: fromAccountID,
+            amount: -magnitude,
+            date: date,
+            status: .uncleared,
+            kind: .transfer(counterpartID: inflowID)
+        )
+        let inflow = Transaction(
+            id: inflowID,
+            accountID: toAccountID,
+            amount: magnitude,
+            date: date,
+            status: .uncleared,
+            kind: .transfer(counterpartID: outflowID)
+        )
+        return (outflow, inflow)
     }
 
     public static func rehydrate(
@@ -79,12 +114,14 @@ public struct Transaction: Sendable {
         )
     }
 
-    public mutating func update(amount: Decimal, date: AcornDate) {
+    public mutating func update(amount: Decimal, date: AcornDate) throws {
+        guard !isDeleted else { throw DomainError.deleted }
         self.amount = amount
         self.date = date
     }
 
-    public mutating func delete() {
+    public mutating func delete() throws {
+        guard !isDeleted else { throw DomainError.deleted }
         isDeleted = true
     }
 
@@ -92,15 +129,27 @@ public struct Transaction: Sendable {
         isDeleted = false
     }
 
-    public mutating func reconcile() {
+    public mutating func reconcile() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard status == .cleared else {
+            throw DomainError.invalidState("transaction is not cleared")
+        }
         status = .reconciled
     }
 
-    public mutating func clear() {
+    public mutating func clear() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard status == .uncleared else {
+            throw DomainError.invalidState("transaction is not uncleared")
+        }
         status = .cleared
     }
 
-    public mutating func unclear() {
+    public mutating func unclear() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard status == .cleared else {
+            throw DomainError.invalidState("transaction is not cleared")
+        }
         status = .uncleared
     }
 }
@@ -109,7 +158,9 @@ public enum TransactionStatus: Sendable {
     case uncleared, cleared, reconciled
 }
 
-public enum TransactionKind: Sendable {
-    case regular, adjustment, starting
-    // TODO: transfer
+public enum TransactionKind: Sendable, Equatable {
+    case regular
+    case adjustment
+    case starting
+    case transfer(counterpartID: UUID)
 }

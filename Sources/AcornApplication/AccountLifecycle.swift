@@ -20,43 +20,34 @@ public struct AccountLifecycle: Sendable {
     }
 
     public func close(accountID: UUID) async throws {
-        guard let account = try await accountRepository.get(id: accountID) else {
+        guard var account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
-        }
-        guard !account.isDeleted, !account.isClosed else {
-            throw ApplicationError.invalidState
         }
         let transactions = try await transactionRepository.forAccount(accountID)
         let balance = BalanceCalculator.balance(of: transactions)
-        if let zeroing = Transaction.adjust(
-            accountID: accountID,
-            amount: -balance,
-            date: todayProvider.today()
-        ) {
+        if balance != 0 {
+            let zeroing = try Transaction.adjust(
+                accountID: accountID,
+                amount: -balance,
+                date: todayProvider.today()
+            )
             try await transactionRepository.save(zeroing)
         }
-        var closed = account
-        closed.close()
-        try await accountRepository.save(closed)
+        try account.close()
+        try await accountRepository.save(account)
     }
 
     public func reopen(accountID: UUID) async throws {
         guard var account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
         }
-        guard !account.isDeleted, account.isClosed else {
-            throw ApplicationError.invalidState
-        }
-        account.reopen()
+        try account.reopen()
         try await accountRepository.save(account)
     }
 
     public func delete(accountID: UUID) async throws {
         guard var account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
-        }
-        guard !account.isDeleted else {
-            throw ApplicationError.invalidState
         }
         let transactions = try await transactionRepository.forAccount(accountID)
         let live = transactions.filter { !$0.isDeleted }
@@ -65,7 +56,7 @@ public struct AccountLifecycle: Sendable {
         guard deletable else {
             throw ApplicationError.invalidState
         }
-        account.delete()
+        try account.delete()
         try await accountRepository.save(account)
     }
 }

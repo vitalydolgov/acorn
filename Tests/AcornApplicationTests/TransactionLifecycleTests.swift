@@ -15,7 +15,7 @@ struct TransactionLifecycleTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let account = try #require(Account.make(name: "Checking", notes: ""))
+            let account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
             self.accounts = accounts
             self.transactions = transactions
@@ -51,7 +51,7 @@ struct TransactionLifecycleTests {
         let tx = try await sut.post(10)
         try await sut.lifecycle.clear(transactionID: tx.id)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("transaction is not uncleared")) {
             try await sut.lifecycle.clear(transactionID: tx.id)
         }
     }
@@ -69,10 +69,10 @@ struct TransactionLifecycleTests {
         let sut = try await SUT()
         let tx = try await sut.post(10)
         var deletedTx = tx
-        deletedTx.delete()
+        try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.clear(transactionID: tx.id)
         }
     }
@@ -96,7 +96,7 @@ struct TransactionLifecycleTests {
         let sut = try await SUT()
         let tx = try await sut.post(10)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("transaction is not cleared")) {
             try await sut.lifecycle.unclear(transactionID: tx.id)
         }
     }
@@ -108,7 +108,7 @@ struct TransactionLifecycleTests {
         try await sut.lifecycle.clear(transactionID: tx.id)
         try await sut.lifecycle.reconcile(transactionID: tx.id)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("transaction is not cleared")) {
             try await sut.lifecycle.unclear(transactionID: tx.id)
         }
     }
@@ -128,10 +128,10 @@ struct TransactionLifecycleTests {
         try await sut.lifecycle.clear(transactionID: tx.id)
         let cleared = try #require(try await sut.transactions.get(id: tx.id))
         var deletedTx = cleared
-        deletedTx.delete()
+        try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.unclear(transactionID: tx.id)
         }
     }
@@ -155,7 +155,7 @@ struct TransactionLifecycleTests {
         let sut = try await SUT()
         let tx = try await sut.post(10)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("transaction is not cleared")) {
             try await sut.lifecycle.reconcile(transactionID: tx.id)
         }
     }
@@ -175,10 +175,10 @@ struct TransactionLifecycleTests {
         try await sut.lifecycle.clear(transactionID: tx.id)
         let cleared = try #require(try await sut.transactions.get(id: tx.id))
         var deletedTx = cleared
-        deletedTx.delete()
+        try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.reconcile(transactionID: tx.id)
         }
     }
@@ -202,7 +202,7 @@ struct TransactionLifecycleTests {
         let tx = try await sut.post(10)
         try await sut.lifecycle.delete(transactionID: tx.id)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.delete(transactionID: tx.id)
         }
     }

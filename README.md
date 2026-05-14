@@ -30,13 +30,14 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 - [x] Transaction lifecycle: clear, unclear, reconcile, delete
 - [x] Deposit, withdraw and adjust transactions
 - [x] Update transaction with validation
+- [x] Transfers between accounts
 - [ ] Categories
 - [ ] Plans (zero-based monthly allocation)
 - [ ] Payees
-- [ ] Transfers between accounts
 - [ ] Reconciliation flow
 - [ ] Undo stack
 - [ ] Pagination
+- [ ] Transactional operations
 - [ ] Concurrency conflict detection (aggregate versioning, `ApplicationError.conflict`)
 - [ ] ...
 

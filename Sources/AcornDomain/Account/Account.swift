@@ -4,17 +4,22 @@ public struct Account: Sendable {
     public let id: UUID
     public private(set) var name: String
     public private(set) var notes: String
-    public private(set) var isClosed: Bool
-    public private(set) var isDeleted: Bool
+    public private(set) var isClosed: Bool = false
+    public private(set) var isDeleted: Bool = false
 
-    public static func make(name: String, notes: String) -> Account? {
-        guard let name = AccountValidation.normalizedName(name) else { return nil }
+    public func assertPostable() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard !isClosed else { throw DomainError.invalidState("account is closed") }
+    }
+
+    public static func make(name: String, notes: String) throws -> Account {
+        guard let name = AccountValidation.normalizedName(name) else {
+            throw DomainError.invalidArgument("name must not be blank")
+        }
         return Account(
             id: UUID(),
             name: name,
-            notes: notes,
-            isClosed: false,
-            isDeleted: false
+            notes: notes
         )
     }
 
@@ -34,23 +39,29 @@ public struct Account: Sendable {
         )
     }
 
-    public mutating func close() {
+    public mutating func close() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard !isClosed else { throw DomainError.invalidState("account is already closed") }
         isClosed = true
     }
 
-    public mutating func reopen() {
+    public mutating func reopen() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard isClosed else { throw DomainError.invalidState("account is not closed") }
         isClosed = false
     }
 
     public mutating func update(name: String, notes: String) throws {
+        guard !isDeleted else { throw DomainError.deleted }
         guard let normalized = AccountValidation.normalizedName(name) else {
-            throw DomainError.invalidArgument("name")
+            throw DomainError.invalidArgument("name must not be blank")
         }
         self.name = normalized
         self.notes = notes
     }
 
-    public mutating func delete() {
+    public mutating func delete() throws {
+        guard !isDeleted else { throw DomainError.deleted }
         isDeleted = true
     }
 

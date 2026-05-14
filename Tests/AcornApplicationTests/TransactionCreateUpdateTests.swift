@@ -14,7 +14,7 @@ struct TransactionCreateUpdateTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let account = try #require(Account.make(name: "Checking", notes: ""))
+            let account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
             self.accounts = accounts
             self.transactions = transactions
@@ -68,10 +68,10 @@ struct TransactionCreateUpdateTests {
     func createFailsOnClosedAccount() async throws {
         let sut = try await SUT()
         var closed = sut.account
-        closed.close()
+        try closed.close()
         try await sut.accounts.save(closed)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("account is closed")) {
             _ = try await sut.createUpdate.post(accountID: sut.account.id, amount: 10, date: Self.today)
         }
     }
@@ -80,10 +80,10 @@ struct TransactionCreateUpdateTests {
     func createFailsOnDeletedAccount() async throws {
         let sut = try await SUT()
         var deleted = sut.account
-        deleted.delete()
+        try deleted.delete()
         try await sut.accounts.save(deleted)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             _ = try await sut.createUpdate.post(accountID: sut.account.id, amount: 10, date: Self.today)
         }
     }
@@ -117,11 +117,60 @@ struct TransactionCreateUpdateTests {
         let sut = try await SUT()
         let tx = try await sut.createUpdate.post(accountID: sut.account.id, amount: 10, date: Self.today)
         var deletedTx = tx
-        deletedTx.delete()
+        try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.createUpdate.update(transactionID: tx.id, amount: 99, date: Self.today)
+        }
+    }
+
+    // MARK: - Transfer
+
+    @Test("transfer stores a linked outflow/inflow pair")
+    func transferStoresLinkedPair() async throws {
+        let sut = try await SUT()
+        let other = try Account.make(name: "Savings", notes: "")
+        try await sut.accounts.save(other)
+
+        let pair = try await sut.createUpdate.transfer(
+            fromAccountID: sut.account.id,
+            toAccountID: other.id,
+            amount: 100,
+            date: Self.today
+        )
+
+        let storedOut = try await sut.transactions.get(id: pair.outflow.id)
+        let storedIn = try await sut.transactions.get(id: pair.inflow.id)
+        #expect(storedOut?.amount == -100)
+        #expect(storedIn?.amount == 100)
+        #expect(storedOut?.kind == .transfer(counterpartID: pair.inflow.id))
+        #expect(storedIn?.kind == .transfer(counterpartID: pair.outflow.id))
+    }
+
+    @Test("transfer fails when either account is unknown")
+    func transferFailsForUnknownAccount() async throws {
+        let sut = try await SUT()
+        await #expect(throws: ApplicationError.notFound) {
+            _ = try await sut.createUpdate.transfer(
+                fromAccountID: sut.account.id,
+                toAccountID: UUID(),
+                amount: 10,
+                date: Self.today
+            )
+        }
+    }
+
+    @Test("transfer fails when accounts are the same")
+    func transferFailsForSameAccount() async throws {
+        let sut = try await SUT()
+        await #expect(throws: DomainError.invalidArgument("source and destination must differ")) {
+            _ = try await sut.createUpdate.transfer(
+                fromAccountID: sut.account.id,
+                toAccountID: sut.account.id,
+                amount: 10,
+                date: Self.today
+            )
         }
     }
 
@@ -130,7 +179,7 @@ struct TransactionCreateUpdateTests {
     @Test("adjust with zero amount fails with invalidArgument")
     func adjustZeroFails() async throws {
         let sut = try await SUT()
-        await #expect(throws: ApplicationError.invalidArgument("amount")) {
+        await #expect(throws: DomainError.invalidArgument("amount must be non-zero")) {
             _ = try await sut.createUpdate.adjust(accountID: sut.account.id, amount: 0, date: Self.today)
         }
     }

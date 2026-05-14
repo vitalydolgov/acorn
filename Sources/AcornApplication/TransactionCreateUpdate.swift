@@ -14,42 +14,50 @@ public struct TransactionCreateUpdate: Sendable {
     }
 
     public func post(accountID: UUID, amount: Decimal, date: AcornDate) async throws -> Transaction {
-        try await postable(accountID)
+        try await assertPostable(accountID)
         let transaction = Transaction.post(accountID: accountID, amount: amount, date: date)
         try await transactionRepository.save(transaction)
         return transaction
     }
 
     public func adjust(accountID: UUID, amount: Decimal, date: AcornDate) async throws -> Transaction {
-        try await postable(accountID)
-        guard let transaction = Transaction.adjust(
-            accountID: accountID,
-            amount: amount,
-            date: date
-        ) else {
-            throw ApplicationError.invalidArgument("amount")
-        }
+        try await assertPostable(accountID)
+        let transaction = try Transaction.adjust(accountID: accountID, amount: amount, date: date)
         try await transactionRepository.save(transaction)
         return transaction
+    }
+
+    public func transfer(
+        fromAccountID: UUID,
+        toAccountID: UUID,
+        amount: Decimal,
+        date: AcornDate
+    ) async throws -> (outflow: Transaction, inflow: Transaction) {
+        try await assertPostable(fromAccountID)
+        try await assertPostable(toAccountID)
+        let pair = try Transaction.transfer(
+            fromAccountID: fromAccountID,
+            toAccountID: toAccountID,
+            amount: amount,
+            date: date
+        )
+        try await transactionRepository.save(pair.outflow)
+        try await transactionRepository.save(pair.inflow)
+        return pair
     }
 
     public func update(transactionID: UUID, amount: Decimal, date: AcornDate) async throws {
         guard var transaction = try await transactionRepository.get(id: transactionID) else {
             throw ApplicationError.notFound
         }
-        guard !transaction.isDeleted else {
-            throw ApplicationError.invalidState
-        }
-        transaction.update(amount: amount, date: date)
+        try transaction.update(amount: amount, date: date)
         try await transactionRepository.save(transaction)
     }
 
-    private func postable(_ accountID: UUID) async throws {
+    private func assertPostable(_ accountID: UUID) async throws {
         guard let account = try await accountRepository.get(id: accountID) else {
             throw ApplicationError.notFound
         }
-        guard !account.isDeleted, !account.isClosed else {
-            throw ApplicationError.invalidState
-        }
+        try account.assertPostable()
     }
 }

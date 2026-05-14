@@ -77,7 +77,7 @@ struct AccountLifecycleTests {
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
         try await sut.lifecycle.close(accountID: account.id)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("account is already closed")) {
             try await sut.lifecycle.close(accountID: account.id)
         }
     }
@@ -87,10 +87,10 @@ struct AccountLifecycleTests {
         let sut = SUT()
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
         var deleted = account
-        deleted.delete()
+        try deleted.delete()
         try await sut.accounts.save(deleted)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.close(accountID: account.id)
         }
     }
@@ -122,7 +122,7 @@ struct AccountLifecycleTests {
         let sut = SUT()
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.invalidState("account is not closed")) {
             try await sut.lifecycle.reopen(accountID: account.id)
         }
     }
@@ -134,10 +134,10 @@ struct AccountLifecycleTests {
         try await sut.lifecycle.close(accountID: account.id)
         let closed = try #require(try await sut.accounts.get(id: account.id))
         var deleted = closed
-        deleted.delete()
+        try deleted.delete()
         try await sut.accounts.save(deleted)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.reopen(accountID: account.id)
         }
     }
@@ -191,7 +191,7 @@ struct AccountLifecycleTests {
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
         let tx = try await sut.transactionCreateUpdate.post(accountID: account.id, amount: 10, date: .today())
         var deletedTx = tx
-        deletedTx.delete()
+        try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
         try await sut.lifecycle.delete(accountID: account.id)
@@ -206,7 +206,7 @@ struct AccountLifecycleTests {
         let account = try await sut.createUpdate.open(name: "A", openingBalance: 0)
         try await sut.lifecycle.delete(accountID: account.id)
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: DomainError.deleted) {
             try await sut.lifecycle.delete(accountID: account.id)
         }
     }

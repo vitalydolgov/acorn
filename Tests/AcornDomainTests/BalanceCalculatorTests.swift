@@ -18,12 +18,12 @@ struct BalanceCalculatorTests {
     // MARK: - balance
 
     @Test("balance sums all non-deleted transactions regardless of status")
-    func balanceSumsAllNonDeleted() {
+    func balanceSumsAllNonDeleted() throws {
         var clearedDeposit = deposit(50)
-        clearedDeposit.clear()
+        try clearedDeposit.clear()
         var reconciledDeposit = deposit(25)
-        reconciledDeposit.clear()
-        reconciledDeposit.reconcile()
+        try reconciledDeposit.clear()
+        try reconciledDeposit.reconcile()
         let txs = [
             deposit(100),
             clearedDeposit,
@@ -34,9 +34,9 @@ struct BalanceCalculatorTests {
     }
 
     @Test("balance skips deleted transactions")
-    func balanceSkipsDeleted() {
+    func balanceSkipsDeleted() throws {
         var deletedDeposit = deposit(999)
-        deletedDeposit.delete()
+        try deletedDeposit.delete()
         let txs = [
             deposit(100),
             deletedDeposit,
@@ -52,12 +52,12 @@ struct BalanceCalculatorTests {
     // MARK: - clearedBalance
 
     @Test("clearedBalance includes cleared and reconciled, excludes uncleared")
-    func clearedBalanceIncludesClearedAndReconciled() {
+    func clearedBalanceIncludesClearedAndReconciled() throws {
         var clearedDeposit = deposit(50)
-        clearedDeposit.clear()
+        try clearedDeposit.clear()
         var reconciledDeposit = deposit(25)
-        reconciledDeposit.clear()
-        reconciledDeposit.reconcile()
+        try reconciledDeposit.clear()
+        try reconciledDeposit.reconcile()
         let txs = [
             deposit(100),
             clearedDeposit,
@@ -67,12 +67,12 @@ struct BalanceCalculatorTests {
     }
 
     @Test("clearedBalance skips deleted transactions")
-    func clearedBalanceSkipsDeleted() {
+    func clearedBalanceSkipsDeleted() throws {
         var clearedDeposit = deposit(50)
-        clearedDeposit.clear()
+        try clearedDeposit.clear()
         var deletedClearedDeposit = deposit(999)
-        deletedClearedDeposit.clear()
-        deletedClearedDeposit.delete()
+        try deletedClearedDeposit.clear()
+        try deletedClearedDeposit.delete()
         let txs = [
             clearedDeposit,
             deletedClearedDeposit,
@@ -83,12 +83,12 @@ struct BalanceCalculatorTests {
     // MARK: - unclearedBalance
 
     @Test("unclearedBalance only counts uncleared transactions")
-    func unclearedBalanceOnlyUncleared() {
+    func unclearedBalanceOnlyUncleared() throws {
         var clearedDeposit = deposit(50)
-        clearedDeposit.clear()
+        try clearedDeposit.clear()
         var reconciledDeposit = deposit(25)
-        reconciledDeposit.clear()
-        reconciledDeposit.reconcile()
+        try reconciledDeposit.clear()
+        try reconciledDeposit.reconcile()
         let txs = [
             deposit(100),
             clearedDeposit,
@@ -99,9 +99,9 @@ struct BalanceCalculatorTests {
     }
 
     @Test("unclearedBalance skips deleted transactions")
-    func unclearedBalanceSkipsDeleted() {
+    func unclearedBalanceSkipsDeleted() throws {
         var deletedDeposit = deposit(999)
-        deletedDeposit.delete()
+        try deletedDeposit.delete()
         let txs = [
             deposit(100),
             deletedDeposit,
@@ -110,14 +110,14 @@ struct BalanceCalculatorTests {
     }
 
     @Test("cleared + uncleared equals total balance")
-    func clearedPlusUnclearedEqualsBalance() {
+    func clearedPlusUnclearedEqualsBalance() throws {
         var clearedDeposit = deposit(50)
-        clearedDeposit.clear()
+        try clearedDeposit.clear()
         var reconciledDeposit = deposit(25)
-        reconciledDeposit.clear()
-        reconciledDeposit.reconcile()
+        try reconciledDeposit.clear()
+        try reconciledDeposit.reconcile()
         var deletedDeposit = deposit(999)
-        deletedDeposit.delete()
+        try deletedDeposit.delete()
         let txs = [
             deposit(100),
             clearedDeposit,
