@@ -18,7 +18,7 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 ## Modules
 
 - `AcornDomain` — entities, value objects, repository protocols, domain logic.
-- `AcornApplication` — application services orchestrating domain operations.
+- `AcornApplication` — one type per use case, plus `UnitOfWork` for use cases that span aggregates.
 
 ## Status
 
@@ -31,15 +31,18 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 - [x] Deposit, withdraw and adjust transactions
 - [x] Update transaction with validation
 - [x] Transfers between accounts
+- [x] Transactional operations (Unit of Work for multi-aggregate use cases, with rollback)
 - [ ] Categories
 - [ ] Plans (zero-based monthly allocation)
 - [ ] Payees
 - [ ] Reconciliation flow
 - [ ] Undo stack
+- [ ] Domain events
 - [ ] Pagination
-- [ ] Transactional operations
 - [ ] Concurrency conflict detection (aggregate versioning, `ApplicationError.conflict`)
 - [ ] ...
+
+Persistence is intentionally out of scope: the library ships repository and `UnitOfWork` protocols, and the consuming app provides the adapter (Core Data, GRDB, SQLite, CloudKit, …) that fits its storage choice.
 
 ## Extending with UI
 

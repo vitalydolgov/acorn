@@ -130,4 +130,76 @@ struct BalanceCalculatorTests {
         let uncleared = BalanceCalculator.unclearedBalance(of: txs)
         #expect(cleared + uncleared == total)
     }
+
+    // MARK: - balance(transactions:transfers:accountID:)
+
+    @Test("balance filters transactions by accountID")
+    func balanceFiltersByAccount() {
+        let other = UUID()
+        let foreign = Transaction.post(accountID: other, amount: 500, date: today)
+        let txs = [deposit(100), foreign]
+        #expect(
+            BalanceCalculator.balance(
+                transactions: txs,
+                transfers: [Transfer](),
+                accountID: accountID
+            ) == 100
+        )
+    }
+
+    @Test("balance subtracts outgoing transfers and adds incoming")
+    func balanceAppliesTransferLegs() throws {
+        let counterpart = UUID()
+        let outgoing = try Transfer.create(
+            fromAccountID: accountID,
+            toAccountID: counterpart,
+            amount: 30,
+            date: today
+        )
+        let incoming = try Transfer.create(
+            fromAccountID: counterpart,
+            toAccountID: accountID,
+            amount: 10,
+            date: today
+        )
+        #expect(
+            BalanceCalculator.balance(
+                transactions: [deposit(100)],
+                transfers: [outgoing, incoming],
+                accountID: accountID
+            ) == 80
+        )
+    }
+
+    @Test("balance skips deleted transfers")
+    func balanceSkipsDeletedTransfers() throws {
+        let counterpart = UUID()
+        var deletedTransfer = try Transfer.create(
+            fromAccountID: accountID,
+            toAccountID: counterpart,
+            amount: 30,
+            date: today
+        )
+        try deletedTransfer.delete()
+        #expect(
+            BalanceCalculator.balance(
+                transactions: [deposit(100)],
+                transfers: [deletedTransfer],
+                accountID: accountID
+            ) == 100
+        )
+    }
+
+    @Test("balance ignores transfers that do not involve the account")
+    func balanceIgnoresUnrelatedTransfers() throws {
+        let a = UUID(), b = UUID()
+        let unrelated = try Transfer.create(fromAccountID: a, toAccountID: b, amount: 50, date: today)
+        #expect(
+            BalanceCalculator.balance(
+                transactions: [deposit(100)],
+                transfers: [unrelated],
+                accountID: accountID
+            ) == 100
+        )
+    }
 }

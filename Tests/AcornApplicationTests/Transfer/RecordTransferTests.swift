@@ -1,0 +1,158 @@
+import Foundation
+import Testing
+@testable import AcornApplication
+import AcornDomain
+
+@Suite("RecordTransfer")
+struct RecordTransferTests {
+    private struct SUT {
+        let recordTransfer: RecordTransfer
+        let accounts: InMemoryAccountRepository
+        let transfers: InMemoryTransferRepository
+        let from: Account
+        let to: Account
+
+        init() async throws {
+            let accounts = InMemoryAccountRepository()
+            let transfers = InMemoryTransferRepository()
+            let from = try Account.make(name: "Checking", notes: "")
+            let to = try Account.make(name: "Savings", notes: "")
+            try await accounts.save(from)
+            try await accounts.save(to)
+            self.accounts = accounts
+            self.transfers = transfers
+            self.from = from
+            self.to = to
+            self.recordTransfer = RecordTransfer(
+                accountRepository: accounts,
+                transferRepository: transfers
+            )
+        }
+    }
+
+    private static let today = AcornDate.today()
+
+    @Test("stores a single Transfer and balances the two accounts")
+    func storesOneTransfer() async throws {
+        let sut = try await SUT()
+
+        let transfer = try await sut.recordTransfer(
+            fromAccountID: sut.from.id,
+            toAccountID: sut.to.id,
+            amount: 100,
+            date: Self.today
+        )
+
+        let stored = try #require(try await sut.transfers.get(id: transfer.id))
+        #expect(stored.fromAccountID == sut.from.id)
+        #expect(stored.toAccountID == sut.to.id)
+        #expect(stored.amount == 100)
+
+        let fromTransfers = try await sut.transfers.forAccount(sut.from.id)
+        let toTransfers = try await sut.transfers.forAccount(sut.to.id)
+        #expect(fromTransfers.count == 1)
+        #expect(toTransfers.count == 1)
+        #expect(fromTransfers[0].id == toTransfers[0].id)
+
+        #expect(
+            BalanceCalculator.balance(
+                transactions: [Transaction](),
+                transfers: fromTransfers,
+                accountID: sut.from.id
+            ) == -100
+        )
+        #expect(
+            BalanceCalculator.balance(
+                transactions: [Transaction](),
+                transfers: toTransfers,
+                accountID: sut.to.id
+            ) == 100
+        )
+    }
+
+    @Test("fails when source account is unknown")
+    func failsForUnknownFrom() async throws {
+        let sut = try await SUT()
+        await #expect(throws: ApplicationError.notFound) {
+            _ = try await sut.recordTransfer(
+                fromAccountID: UUID(),
+                toAccountID: sut.to.id,
+                amount: 10,
+                date: Self.today
+            )
+        }
+    }
+
+    @Test("fails when destination account is unknown")
+    func failsForUnknownTo() async throws {
+        let sut = try await SUT()
+        await #expect(throws: ApplicationError.notFound) {
+            _ = try await sut.recordTransfer(
+                fromAccountID: sut.from.id,
+                toAccountID: UUID(),
+                amount: 10,
+                date: Self.today
+            )
+        }
+    }
+
+    @Test("fails on a closed account")
+    func failsOnClosed() async throws {
+        let sut = try await SUT()
+        var closed = sut.from
+        try closed.close()
+        try await sut.accounts.save(closed)
+
+        await #expect(throws: DomainError.invalidState("account is closed")) {
+            _ = try await sut.recordTransfer(
+                fromAccountID: sut.from.id,
+                toAccountID: sut.to.id,
+                amount: 10,
+                date: Self.today
+            )
+        }
+    }
+
+    @Test("fails on a deleted account")
+    func failsOnDeleted() async throws {
+        let sut = try await SUT()
+        var deleted = sut.to
+        try deleted.delete()
+        try await sut.accounts.save(deleted)
+
+        await #expect(throws: DomainError.deleted) {
+            _ = try await sut.recordTransfer(
+                fromAccountID: sut.from.id,
+                toAccountID: sut.to.id,
+                amount: 10,
+                date: Self.today
+            )
+        }
+    }
+
+    @Test("fails when accounts are the same")
+    func failsForSameAccount() async throws {
+        let sut = try await SUT()
+        await #expect(throws: DomainError.invalidArgument("source and destination must differ")) {
+            _ = try await sut.recordTransfer(
+                fromAccountID: sut.from.id,
+                toAccountID: sut.from.id,
+                amount: 10,
+                date: Self.today
+            )
+        }
+    }
+
+    @Test("fails for non-positive amount")
+    func failsForNonPositive() async throws {
+        let sut = try await SUT()
+        await #expect(throws: DomainError.invalidArgument("amount must be positive")) {
+            _ = try await sut.recordTransfer(
+                fromAccountID: sut.from.id,
+                toAccountID: sut.to.id,
+                amount: 0,
+                date: Self.today
+            )
+        }
+    }
+}

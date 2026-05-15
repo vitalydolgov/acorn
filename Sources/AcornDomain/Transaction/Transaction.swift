@@ -42,58 +42,6 @@ public struct Transaction: Sendable {
         )
     }
 
-    public static func starting(
-        accountID: UUID,
-        amount: Decimal,
-        date: AcornDate
-    ) throws -> Transaction {
-        guard amount != 0 else {
-            throw DomainError.invalidArgument("amount must be non-zero")
-        }
-        return Transaction(
-            id: UUID(),
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: .cleared,
-            kind: .starting
-        )
-    }
-
-    public static func transfer(
-        fromAccountID: UUID,
-        toAccountID: UUID,
-        amount: Decimal,
-        date: AcornDate
-    ) throws -> (outflow: Transaction, inflow: Transaction) {
-        guard amount != 0 else {
-            throw DomainError.invalidArgument("amount must be non-zero")
-        }
-        guard fromAccountID != toAccountID else {
-            throw DomainError.invalidArgument("source and destination must differ")
-        }
-        let outflowID = UUID()
-        let inflowID = UUID()
-        let magnitude = abs(amount)
-        let outflow = Transaction(
-            id: outflowID,
-            accountID: fromAccountID,
-            amount: -magnitude,
-            date: date,
-            status: .uncleared,
-            kind: .transfer(counterpartID: inflowID)
-        )
-        let inflow = Transaction(
-            id: inflowID,
-            accountID: toAccountID,
-            amount: magnitude,
-            date: date,
-            status: .uncleared,
-            kind: .transfer(counterpartID: outflowID)
-        )
-        return (outflow, inflow)
-    }
-
     public static func rehydrate(
         id: UUID,
         accountID: UUID,
@@ -161,6 +109,4 @@ public enum TransactionStatus: Sendable {
 public enum TransactionKind: Sendable, Equatable {
     case regular
     case adjustment
-    case starting
-    case transfer(counterpartID: UUID)
 }
