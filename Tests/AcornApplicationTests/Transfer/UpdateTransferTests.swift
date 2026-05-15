@@ -6,27 +6,38 @@ import AcornDomain
 @Suite("UpdateTransfer")
 struct UpdateTransferTests {
     private struct SUT {
+        // Repos
+        let transfers: InMemoryTransferRepository
+
+        // Services
         let recordTransfer: RecordTransfer
         let updateTransfer: UpdateTransfer
-        let transfers: InMemoryTransferRepository
-        let from: Account
-        let to: Account
+
+        let seedFrom: Account
+        let seedTo: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transfers = InMemoryTransferRepository()
-            let from = try Account.make(name: "Checking", notes: "")
-            let to = try Account.make(name: "Savings", notes: "")
-            try await accounts.save(from)
-            try await accounts.save(to)
+
+            // Repos
             self.transfers = transfers
-            self.from = from
-            self.to = to
+
+            // Services
             self.recordTransfer = RecordTransfer(
                 accountRepository: accounts,
                 transferRepository: transfers
             )
             self.updateTransfer = UpdateTransfer(transferRepository: transfers)
+
+            var from = try Account.make(name: "Checking", notes: "")
+            var to = try Account.make(name: "Savings", notes: "")
+            try await accounts.save(from)
+            from = try await accounts.get(id: from.id)!
+            try await accounts.save(to)
+            to = try await accounts.get(id: to.id)!
+            self.seedFrom = from
+            self.seedTo = to
         }
     }
 
@@ -36,8 +47,8 @@ struct UpdateTransferTests {
     func changesAmountAndDate() async throws {
         let sut = try await SUT()
         let transfer = try await sut.recordTransfer(
-            fromAccountID: sut.from.id,
-            toAccountID: sut.to.id,
+            fromAccountID: sut.seedFrom.id,
+            toAccountID: sut.seedTo.id,
             amount: 10,
             date: Self.today
         )

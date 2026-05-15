@@ -6,28 +6,42 @@ import AcornDomain
 @Suite("ReopenAccount")
 struct ReopenAccountTests {
     private struct SUT {
+        let uow: InMemoryUnitOfWork
+        let todayProvider: TodayProvider
+
+        // Repos
+        let accounts: InMemoryAccountRepository
+
+        // Services
         let openAccount: OpenAccount
         let closeAccount: CloseAccount
         let reopenAccount: ReopenAccount
-        let accounts: InMemoryAccountRepository
 
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
             let transfers = InMemoryTransferRepository()
-            self.accounts = accounts
-            self.openAccount = OpenAccount(accountRepository: accounts)
-            let uow = InMemoryUnitOfWork(
+
+            self.uow = InMemoryUnitOfWork(
                 accounts: accounts,
                 transactions: transactions,
                 transfers: transfers
             )
+            self.todayProvider = FixedTodayProvider(date: .today())
+
+            // Repos
+            self.accounts = accounts
+
+            // Services
+            self.openAccount = OpenAccount(accountRepository: accounts)
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
-                todayProvider: FixedTodayProvider(date: .today())
+                todayProvider: todayProvider
             )
             self.reopenAccount = ReopenAccount(accountRepository: accounts)
         }
+
+        var today: AcornDate { todayProvider.today() }
     }
 
     @Test("flips closed to open")

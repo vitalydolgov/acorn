@@ -6,23 +6,33 @@ import AcornDomain
 @Suite("AdjustAccount")
 struct AdjustAccountTests {
     private struct SUT {
-        let adjustAccount: AdjustAccount
+        // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
-        let account: Account
+
+        // Services
+        let adjustAccount: AdjustAccount
+
+        let seedAccount: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let account = try Account.make(name: "Checking", notes: "")
-            try await accounts.save(account)
+
+            // Repos
             self.accounts = accounts
             self.transactions = transactions
-            self.account = account
+
+            // Services
             self.adjustAccount = AdjustAccount(
                 accountRepository: accounts,
                 transactionRepository: transactions
             )
+
+            var account = try Account.make(name: "Checking", notes: "")
+            try await accounts.save(account)
+            account = try await accounts.get(id: account.id)!
+            self.seedAccount = account
         }
     }
 
@@ -32,7 +42,7 @@ struct AdjustAccountTests {
     func createsAdjustment() async throws {
         let sut = try await SUT()
 
-        let tx = try await sut.adjustAccount(accountID: sut.account.id, amount: -7, date: Self.today)
+        let tx = try await sut.adjustAccount(accountID: sut.seedAccount.id, amount: -7, date: Self.today)
 
         #expect(tx.amount == -7)
         #expect(tx.kind == .adjustment)
@@ -42,19 +52,19 @@ struct AdjustAccountTests {
     func zeroAmountFails() async throws {
         let sut = try await SUT()
         await #expect(throws: DomainError.invalidArgument("amount must be non-zero")) {
-            _ = try await sut.adjustAccount(accountID: sut.account.id, amount: 0, date: Self.today)
+            _ = try await sut.adjustAccount(accountID: sut.seedAccount.id, amount: 0, date: Self.today)
         }
     }
 
     @Test("fails on a closed account")
     func failsOnClosed() async throws {
         let sut = try await SUT()
-        var closed = sut.account
+        var closed = sut.seedAccount
         try closed.close()
         try await sut.accounts.save(closed)
 
         await #expect(throws: DomainError.invalidState("account is closed")) {
-            _ = try await sut.adjustAccount(accountID: sut.account.id, amount: 10, date: Self.today)
+            _ = try await sut.adjustAccount(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         }
     }
 }

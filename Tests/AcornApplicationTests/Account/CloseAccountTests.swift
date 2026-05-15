@@ -3,28 +3,45 @@ import Testing
 @testable import AcornApplication
 import AcornDomain
 
+private struct InjectedFailure: Error, Equatable {}
+
 @Suite("CloseAccount")
 struct CloseAccountTests {
     private struct SUT {
-        let closeAccount: CloseAccount
-        let openAccount: OpenAccount
-        let postTransaction: PostTransaction
-        let recordTransfer: RecordTransfer
+        let uow: InMemoryUnitOfWork
+        let todayProvider: TodayProvider
+
+        // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
         let transfers: InMemoryTransferRepository
-        let today: AcornDate
 
-        init(today: AcornDate = .today()) {
+        // Services
+        let openAccount: OpenAccount
+        let addTransaction: AddTransaction
+        let recordTransfer: RecordTransfer
+        let closeAccount: CloseAccount
+
+        init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
             let transfers = InMemoryTransferRepository()
+
+            self.uow = InMemoryUnitOfWork(
+                accounts: accounts,
+                transactions: transactions,
+                transfers: transfers
+            )
+            self.todayProvider = FixedTodayProvider(date: .today())
+
+            // Repos
             self.accounts = accounts
             self.transactions = transactions
             self.transfers = transfers
-            self.today = today
+
+            // Services
             self.openAccount = OpenAccount(accountRepository: accounts)
-            self.postTransaction = PostTransaction(
+            self.addTransaction = AddTransaction(
                 accountRepository: accounts,
                 transactionRepository: transactions
             )
@@ -32,16 +49,13 @@ struct CloseAccountTests {
                 accountRepository: accounts,
                 transferRepository: transfers
             )
-            let uow = InMemoryUnitOfWork(
-                accounts: accounts,
-                transactions: transactions,
-                transfers: transfers
-            )
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
-                todayProvider: FixedTodayProvider(date: today)
+                todayProvider: todayProvider
             )
         }
+
+        var today: AcornDate { todayProvider.today() }
     }
 
     @Test("zero balance closes the account and posts no adjustment")
@@ -61,7 +75,7 @@ struct CloseAccountTests {
     func positiveBalanceZeroesAndCloses() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.postTransaction(accountID: account.id, amount: 100, date: sut.today)
+        _ = try await sut.addTransaction(accountID: account.id, amount: 100, date: sut.today)
 
         try await sut.closeAccount(accountID: account.id)
 
@@ -84,7 +98,7 @@ struct CloseAccountTests {
     func negativeBalanceZeroesAndCloses() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.postTransaction(accountID: account.id, amount: -40, date: sut.today)
+        _ = try await sut.addTransaction(accountID: account.id, amount: -40, date: sut.today)
 
         try await sut.closeAccount(accountID: account.id)
 
@@ -120,8 +134,8 @@ struct CloseAccountTests {
     func softDeletedTransactionsIgnored() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        let tx = try await sut.postTransaction(accountID: account.id, amount: 50, date: sut.today)
-        var deleted = tx
+        let tx = try await sut.addTransaction(accountID: account.id, amount: 50, date: sut.today)
+        var deleted = try await sut.transactions.get(id: tx.id)!
         try deleted.delete()
         try await sut.transactions.save(deleted)
 
@@ -156,8 +170,8 @@ struct CloseAccountTests {
     func rollbackOnAccountSaveFailure() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.postTransaction(accountID: account.id, amount: 100, date: sut.today)
-        sut.accounts.failNextSave = true
+        _ = try await sut.addTransaction(accountID: account.id, amount: 100, date: sut.today)
+        sut.accounts.saveHook = { _ in throw InjectedFailure() }
 
         await #expect(throws: InjectedFailure.self) {
             try await sut.closeAccount(accountID: account.id)
@@ -173,7 +187,7 @@ struct CloseAccountTests {
     func failsOnDeleted() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        var deleted = account
+        var deleted = try await sut.accounts.get(id: account.id)!
         try deleted.delete()
         try await sut.accounts.save(deleted)
 

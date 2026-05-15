@@ -6,23 +6,30 @@ import AcornDomain
 @Suite("DeleteAccount")
 struct DeleteAccountTests {
     private struct SUT {
-        let openAccount: OpenAccount
-        let postTransaction: PostTransaction
-        let recordTransfer: RecordTransfer
-        let deleteAccount: DeleteAccount
+        // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
         let transfers: InMemoryTransferRepository
+
+        // Services
+        let openAccount: OpenAccount
+        let addTransaction: AddTransaction
+        let recordTransfer: RecordTransfer
+        let deleteAccount: DeleteAccount
 
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
             let transfers = InMemoryTransferRepository()
+
+            // Repos
             self.accounts = accounts
             self.transactions = transactions
             self.transfers = transfers
+
+            // Services
             self.openAccount = OpenAccount(accountRepository: accounts)
-            self.postTransaction = PostTransaction(
+            self.addTransaction = AddTransaction(
                 accountRepository: accounts,
                 transactionRepository: transactions
             )
@@ -61,7 +68,7 @@ struct DeleteAccountTests {
     func blockedByTransactions() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.postTransaction(accountID: account.id, amount: 10, date: .today())
+        _ = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
 
         await #expect(throws: ApplicationError.invalidState) {
             try await sut.deleteAccount(accountID: account.id)
@@ -90,8 +97,8 @@ struct DeleteAccountTests {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
         let other = try await sut.openAccount(name: "B")
-        let tx = try await sut.postTransaction(accountID: account.id, amount: 10, date: .today())
-        var deletedTx = tx
+        let tx = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
+        var deletedTx = try await sut.transactions.get(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
         let transfer = try await sut.recordTransfer(
@@ -100,7 +107,7 @@ struct DeleteAccountTests {
             amount: 5,
             date: .today()
         )
-        var deletedTransfer = transfer
+        var deletedTransfer = try await sut.transfers.get(id: transfer.id)!
         try deletedTransfer.delete()
         try await sut.transfers.save(deletedTransfer)
 

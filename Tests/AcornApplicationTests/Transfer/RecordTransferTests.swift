@@ -6,27 +6,38 @@ import AcornDomain
 @Suite("RecordTransfer")
 struct RecordTransferTests {
     private struct SUT {
-        let recordTransfer: RecordTransfer
+        // Repos
         let accounts: InMemoryAccountRepository
         let transfers: InMemoryTransferRepository
-        let from: Account
-        let to: Account
+
+        // Services
+        let recordTransfer: RecordTransfer
+
+        let seedFrom: Account
+        let seedTo: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transfers = InMemoryTransferRepository()
-            let from = try Account.make(name: "Checking", notes: "")
-            let to = try Account.make(name: "Savings", notes: "")
-            try await accounts.save(from)
-            try await accounts.save(to)
+
+            // Repos
             self.accounts = accounts
             self.transfers = transfers
-            self.from = from
-            self.to = to
+
+            // Services
             self.recordTransfer = RecordTransfer(
                 accountRepository: accounts,
                 transferRepository: transfers
             )
+
+            var from = try Account.make(name: "Checking", notes: "")
+            var to = try Account.make(name: "Savings", notes: "")
+            try await accounts.save(from)
+            from = try await accounts.get(id: from.id)!
+            try await accounts.save(to)
+            to = try await accounts.get(id: to.id)!
+            self.seedFrom = from
+            self.seedTo = to
         }
     }
 
@@ -37,19 +48,19 @@ struct RecordTransferTests {
         let sut = try await SUT()
 
         let transfer = try await sut.recordTransfer(
-            fromAccountID: sut.from.id,
-            toAccountID: sut.to.id,
+            fromAccountID: sut.seedFrom.id,
+            toAccountID: sut.seedTo.id,
             amount: 100,
             date: Self.today
         )
 
         let stored = try #require(try await sut.transfers.get(id: transfer.id))
-        #expect(stored.fromAccountID == sut.from.id)
-        #expect(stored.toAccountID == sut.to.id)
+        #expect(stored.fromAccountID == sut.seedFrom.id)
+        #expect(stored.toAccountID == sut.seedTo.id)
         #expect(stored.amount == 100)
 
-        let fromTransfers = try await sut.transfers.forAccount(sut.from.id)
-        let toTransfers = try await sut.transfers.forAccount(sut.to.id)
+        let fromTransfers = try await sut.transfers.forAccount(sut.seedFrom.id)
+        let toTransfers = try await sut.transfers.forAccount(sut.seedTo.id)
         #expect(fromTransfers.count == 1)
         #expect(toTransfers.count == 1)
         #expect(fromTransfers[0].id == toTransfers[0].id)
@@ -58,14 +69,14 @@ struct RecordTransferTests {
             BalanceCalculator.balance(
                 transactions: [Transaction](),
                 transfers: fromTransfers,
-                accountID: sut.from.id
+                accountID: sut.seedFrom.id
             ) == -100
         )
         #expect(
             BalanceCalculator.balance(
                 transactions: [Transaction](),
                 transfers: toTransfers,
-                accountID: sut.to.id
+                accountID: sut.seedTo.id
             ) == 100
         )
     }
@@ -76,7 +87,7 @@ struct RecordTransferTests {
         await #expect(throws: ApplicationError.notFound) {
             _ = try await sut.recordTransfer(
                 fromAccountID: UUID(),
-                toAccountID: sut.to.id,
+                toAccountID: sut.seedTo.id,
                 amount: 10,
                 date: Self.today
             )
@@ -88,7 +99,7 @@ struct RecordTransferTests {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.notFound) {
             _ = try await sut.recordTransfer(
-                fromAccountID: sut.from.id,
+                fromAccountID: sut.seedFrom.id,
                 toAccountID: UUID(),
                 amount: 10,
                 date: Self.today
@@ -99,14 +110,14 @@ struct RecordTransferTests {
     @Test("fails on a closed account")
     func failsOnClosed() async throws {
         let sut = try await SUT()
-        var closed = sut.from
+        var closed = sut.seedFrom
         try closed.close()
         try await sut.accounts.save(closed)
 
         await #expect(throws: DomainError.invalidState("account is closed")) {
             _ = try await sut.recordTransfer(
-                fromAccountID: sut.from.id,
-                toAccountID: sut.to.id,
+                fromAccountID: sut.seedFrom.id,
+                toAccountID: sut.seedTo.id,
                 amount: 10,
                 date: Self.today
             )
@@ -116,14 +127,14 @@ struct RecordTransferTests {
     @Test("fails on a deleted account")
     func failsOnDeleted() async throws {
         let sut = try await SUT()
-        var deleted = sut.to
+        var deleted = sut.seedTo
         try deleted.delete()
         try await sut.accounts.save(deleted)
 
         await #expect(throws: DomainError.deleted) {
             _ = try await sut.recordTransfer(
-                fromAccountID: sut.from.id,
-                toAccountID: sut.to.id,
+                fromAccountID: sut.seedFrom.id,
+                toAccountID: sut.seedTo.id,
                 amount: 10,
                 date: Self.today
             )
@@ -135,8 +146,8 @@ struct RecordTransferTests {
         let sut = try await SUT()
         await #expect(throws: DomainError.invalidArgument("source and destination must differ")) {
             _ = try await sut.recordTransfer(
-                fromAccountID: sut.from.id,
-                toAccountID: sut.from.id,
+                fromAccountID: sut.seedFrom.id,
+                toAccountID: sut.seedFrom.id,
                 amount: 10,
                 date: Self.today
             )
@@ -148,8 +159,8 @@ struct RecordTransferTests {
         let sut = try await SUT()
         await #expect(throws: DomainError.invalidArgument("amount must be positive")) {
             _ = try await sut.recordTransfer(
-                fromAccountID: sut.from.id,
-                toAccountID: sut.to.id,
+                fromAccountID: sut.seedFrom.id,
+                toAccountID: sut.seedTo.id,
                 amount: 0,
                 date: Self.today
             )

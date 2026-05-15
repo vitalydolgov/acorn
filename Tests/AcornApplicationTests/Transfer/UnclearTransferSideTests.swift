@@ -6,35 +6,46 @@ import AcornDomain
 @Suite("UnclearTransferSide")
 struct UnclearTransferSideTests {
     private struct SUT {
+        // Repos
+        let transfers: InMemoryTransferRepository
+
+        // Services
         let recordTransfer: RecordTransfer
         let clearSide: ClearTransferSide
         let unclearSide: UnclearTransferSide
-        let transfers: InMemoryTransferRepository
-        let from: Account
-        let to: Account
+
+        let seedFrom: Account
+        let seedTo: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transfers = InMemoryTransferRepository()
-            let from = try Account.make(name: "Checking", notes: "")
-            let to = try Account.make(name: "Savings", notes: "")
-            try await accounts.save(from)
-            try await accounts.save(to)
+
+            // Repos
             self.transfers = transfers
-            self.from = from
-            self.to = to
+
+            // Services
             self.recordTransfer = RecordTransfer(
                 accountRepository: accounts,
                 transferRepository: transfers
             )
             self.clearSide = ClearTransferSide(transferRepository: transfers)
             self.unclearSide = UnclearTransferSide(transferRepository: transfers)
+
+            var from = try Account.make(name: "Checking", notes: "")
+            var to = try Account.make(name: "Savings", notes: "")
+            try await accounts.save(from)
+            from = try await accounts.get(id: from.id)!
+            try await accounts.save(to)
+            to = try await accounts.get(id: to.id)!
+            self.seedFrom = from
+            self.seedTo = to
         }
 
         func make() async throws -> Transfer {
             try await recordTransfer(
-                fromAccountID: from.id,
-                toAccountID: to.id,
+                fromAccountID: seedFrom.id,
+                toAccountID: seedTo.id,
                 amount: 50,
                 date: .today()
             )

@@ -6,27 +6,37 @@ import AcornDomain
 @Suite("ClearTransaction")
 struct ClearTransactionTests {
     private struct SUT {
-        let postTransaction: PostTransaction
-        let clearTransaction: ClearTransaction
+        // Repos
         let transactions: InMemoryTransactionRepository
-        let account: Account
+
+        // Services
+        let addTransaction: AddTransaction
+        let clearTransaction: ClearTransaction
+
+        let seedAccount: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let account = try Account.make(name: "Checking", notes: "")
-            try await accounts.save(account)
+
+            // Repos
             self.transactions = transactions
-            self.account = account
-            self.postTransaction = PostTransaction(
+
+            // Services
+            self.addTransaction = AddTransaction(
                 accountRepository: accounts,
                 transactionRepository: transactions
             )
             self.clearTransaction = ClearTransaction(transactionRepository: transactions)
+
+            var account = try Account.make(name: "Checking", notes: "")
+            try await accounts.save(account)
+            account = try await accounts.get(id: account.id)!
+            self.seedAccount = account
         }
 
         func post(_ amount: Decimal = 10) async throws -> Transaction {
-            try await postTransaction(accountID: account.id, amount: amount, date: .today())
+            try await addTransaction(accountID: seedAccount.id, amount: amount, date: .today())
         }
     }
 
@@ -64,7 +74,7 @@ struct ClearTransactionTests {
     func failsOnDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        var deletedTx = tx
+        var deletedTx = try await sut.transactions.get(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 

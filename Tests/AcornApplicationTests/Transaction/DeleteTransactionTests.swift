@@ -6,27 +6,37 @@ import AcornDomain
 @Suite("DeleteTransaction")
 struct DeleteTransactionTests {
     private struct SUT {
-        let postTransaction: PostTransaction
-        let deleteTransaction: DeleteTransaction
+        // Repos
         let transactions: InMemoryTransactionRepository
-        let account: Account
+
+        // Services
+        let addTransaction: AddTransaction
+        let deleteTransaction: DeleteTransaction
+
+        let seedAccount: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let account = try Account.make(name: "Checking", notes: "")
-            try await accounts.save(account)
+
+            // Repos
             self.transactions = transactions
-            self.account = account
-            self.postTransaction = PostTransaction(
+
+            // Services
+            self.addTransaction = AddTransaction(
                 accountRepository: accounts,
                 transactionRepository: transactions
             )
             self.deleteTransaction = DeleteTransaction(transactionRepository: transactions)
+
+            var account = try Account.make(name: "Checking", notes: "")
+            try await accounts.save(account)
+            account = try await accounts.get(id: account.id)!
+            self.seedAccount = account
         }
 
         func post() async throws -> Transaction {
-            try await postTransaction(accountID: account.id, amount: 10, date: .today())
+            try await addTransaction(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 

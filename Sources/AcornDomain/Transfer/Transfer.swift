@@ -1,7 +1,8 @@
 import Foundation
 
-public struct Transfer: Sendable {
+public struct Transfer: Versioned, Sendable {
     public let id: UUID
+    public var version: Int = 0
     public let fromAccountID: UUID
     public let toAccountID: UUID
     public private(set) var amount: Decimal
@@ -36,6 +37,7 @@ public struct Transfer: Sendable {
 
     public static func rehydrate(
         id: UUID,
+        version: Int,
         fromAccountID: UUID,
         toAccountID: UUID,
         amount: Decimal,
@@ -46,6 +48,7 @@ public struct Transfer: Sendable {
     ) -> Transfer {
         Transfer(
             id: id,
+            version: version,
             fromAccountID: fromAccountID,
             toAccountID: toAccountID,
             amount: amount,

@@ -1,7 +1,7 @@
 import Foundation
 import AcornDomain
 
-public struct PostTransaction: Sendable {
+public struct AddTransaction: Sendable {
     private let accountRepository: any AccountRepository
     private let transactionRepository: any TransactionRepository
 
@@ -18,7 +18,7 @@ public struct PostTransaction: Sendable {
             throw ApplicationError.notFound
         }
         try account.assertPostable()
-        let transaction = Transaction.post(accountID: accountID, amount: amount, date: date)
+        let transaction = Transaction.add(accountID: accountID, amount: amount, date: date)
         try await transactionRepository.save(transaction)
         return transaction
     }

@@ -1,7 +1,8 @@
 import Foundation
 
-public struct Account: Sendable {
+public struct Account: Versioned, Sendable {
     public let id: UUID
+    public var version: Int = 0
     public private(set) var name: String
     public private(set) var notes: String
     public private(set) var isClosed: Bool = false
@@ -25,6 +26,7 @@ public struct Account: Sendable {
 
     public static func rehydrate(
         id: UUID,
+        version: Int,
         name: String,
         notes: String,
         isClosed: Bool,
@@ -32,6 +34,7 @@ public struct Account: Sendable {
     ) -> Account {
         Account(
             id: id,
+            version: version,
             name: name,
             notes: notes,
             isClosed: isClosed,

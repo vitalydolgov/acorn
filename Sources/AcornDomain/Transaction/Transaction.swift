@@ -1,7 +1,8 @@
 import Foundation
 
-public struct Transaction: Sendable {
+public struct Transaction: Versioned, Sendable {
     public let id: UUID
+    public var version: Int = 0
     public let accountID: UUID
     public private(set) var amount: Decimal
     public private(set) var date: AcornDate
@@ -9,7 +10,7 @@ public struct Transaction: Sendable {
     public let kind: TransactionKind
     public private(set) var isDeleted: Bool = false
 
-    public static func post(
+    public static func add(
         accountID: UUID,
         amount: Decimal,
         date: AcornDate
@@ -44,6 +45,7 @@ public struct Transaction: Sendable {
 
     public static func rehydrate(
         id: UUID,
+        version: Int,
         accountID: UUID,
         amount: Decimal,
         date: AcornDate,
@@ -53,6 +55,7 @@ public struct Transaction: Sendable {
     ) -> Transaction {
         Transaction(
             id: id,
+            version: version,
             accountID: accountID,
             amount: amount,
             date: date,

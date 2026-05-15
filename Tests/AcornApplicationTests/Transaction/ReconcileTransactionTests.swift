@@ -6,29 +6,39 @@ import AcornDomain
 @Suite("ReconcileTransaction")
 struct ReconcileTransactionTests {
     private struct SUT {
-        let postTransaction: PostTransaction
+        // Repos
+        let transactions: InMemoryTransactionRepository
+
+        // Services
+        let addTransaction: AddTransaction
         let clearTransaction: ClearTransaction
         let reconcileTransaction: ReconcileTransaction
-        let transactions: InMemoryTransactionRepository
-        let account: Account
+
+        let seedAccount: Account
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let account = try Account.make(name: "Checking", notes: "")
-            try await accounts.save(account)
+
+            // Repos
             self.transactions = transactions
-            self.account = account
-            self.postTransaction = PostTransaction(
+
+            // Services
+            self.addTransaction = AddTransaction(
                 accountRepository: accounts,
                 transactionRepository: transactions
             )
             self.clearTransaction = ClearTransaction(transactionRepository: transactions)
             self.reconcileTransaction = ReconcileTransaction(transactionRepository: transactions)
+
+            var account = try Account.make(name: "Checking", notes: "")
+            try await accounts.save(account)
+            account = try await accounts.get(id: account.id)!
+            self.seedAccount = account
         }
 
         func post() async throws -> Transaction {
-            try await postTransaction(accountID: account.id, amount: 10, date: .today())
+            try await addTransaction(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 

@@ -8,11 +8,11 @@ struct BalanceCalculatorTests {
     private let today = AcornDate.today()
 
     private func deposit(_ amount: Decimal) -> Transaction {
-        Transaction.post(accountID: accountID, amount: amount, date: today)
+        Transaction.add(accountID: accountID, amount: amount, date: today)
     }
 
     private func withdraw(_ amount: Decimal) -> Transaction {
-        Transaction.post(accountID: accountID, amount: -amount, date: today)
+        Transaction.add(accountID: accountID, amount: -amount, date: today)
     }
 
     // MARK: - balance
@@ -136,7 +136,7 @@ struct BalanceCalculatorTests {
     @Test("balance filters transactions by accountID")
     func balanceFiltersByAccount() {
         let other = UUID()
-        let foreign = Transaction.post(accountID: other, amount: 500, date: today)
+        let foreign = Transaction.add(accountID: other, amount: 500, date: today)
         let txs = [deposit(100), foreign]
         #expect(
             BalanceCalculator.balance(

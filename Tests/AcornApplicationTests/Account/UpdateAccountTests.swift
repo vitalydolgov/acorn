@@ -6,13 +6,20 @@ import AcornDomain
 @Suite("UpdateAccount")
 struct UpdateAccountTests {
     private struct SUT {
+        // Repos
+        let accounts: InMemoryAccountRepository
+
+        // Services
         let openAccount: OpenAccount
         let updateAccount: UpdateAccount
-        let accounts: InMemoryAccountRepository
 
         init() {
             let accounts = InMemoryAccountRepository()
+
+            // Repos
             self.accounts = accounts
+
+            // Services
             self.openAccount = OpenAccount(accountRepository: accounts)
             self.updateAccount = UpdateAccount(accountRepository: accounts)
         }
@@ -43,7 +50,7 @@ struct UpdateAccountTests {
     func failsOnDeleted() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "Old")
-        var deleted = account
+        var deleted = try await sut.accounts.get(id: account.id)!
         try deleted.delete()
         try await sut.accounts.save(deleted)
 

@@ -6,14 +6,22 @@ import AcornDomain
 @Suite("OpenAccount")
 struct OpenAccountTests {
     private struct SUT {
-        let openAccount: OpenAccount
+        // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
 
+        // Services
+        let openAccount: OpenAccount
+
         init() {
             let accounts = InMemoryAccountRepository()
+            let transactions = InMemoryTransactionRepository()
+
+            // Repos
             self.accounts = accounts
-            self.transactions = InMemoryTransactionRepository()
+            self.transactions = transactions
+
+            // Services
             self.openAccount = OpenAccount(accountRepository: accounts)
         }
     }
