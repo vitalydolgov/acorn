@@ -6,6 +6,8 @@ import AcornDomain
 @Suite("UnclearTransferSide")
 struct UnclearTransferSideTests {
     private struct SUT {
+        let uow: InMemoryUnitOfWork
+
         // Repos
         let transfers: InMemoryTransferRepository
 
@@ -19,18 +21,18 @@ struct UnclearTransferSideTests {
 
         init() async throws {
             let accounts = InMemoryAccountRepository()
+            let transactions = InMemoryTransactionRepository()
             let transfers = InMemoryTransferRepository()
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            self.uow = uow
 
             // Repos
             self.transfers = transfers
 
             // Services
-            self.recordTransfer = RecordTransfer(
-                accountRepository: accounts,
-                transferRepository: transfers
-            )
-            self.clearSide = ClearTransferSide(transferRepository: transfers)
-            self.unclearSide = UnclearTransferSide(transferRepository: transfers)
+            self.recordTransfer = RecordTransfer(unitOfWork: uow)
+            self.clearSide = ClearTransferSide(unitOfWork: uow)
+            self.unclearSide = UnclearTransferSide(unitOfWork: uow)
 
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")

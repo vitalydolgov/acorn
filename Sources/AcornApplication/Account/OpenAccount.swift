@@ -2,15 +2,16 @@ import Foundation
 import AcornDomain
 
 public struct OpenAccount: Sendable {
-    private let accountRepository: any AccountRepository
+    private let unitOfWork: any UnitOfWork
 
-    public init(accountRepository: any AccountRepository) {
-        self.accountRepository = accountRepository
+    public init(unitOfWork: any UnitOfWork) {
+        self.unitOfWork = unitOfWork
     }
 
+    @UnitOfWork
     public func callAsFunction(name: String, notes: String = "") async throws -> Account {
         let account = try Account.make(name: name, notes: notes)
-        try await accountRepository.save(account)
+        try await ctx.accounts.save(account)
         return account
     }
 }

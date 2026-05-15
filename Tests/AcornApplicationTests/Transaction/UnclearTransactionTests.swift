@@ -6,6 +6,8 @@ import AcornDomain
 @Suite("UnclearTransaction")
 struct UnclearTransactionTests {
     private struct SUT {
+        let uow: InMemoryUnitOfWork
+
         // Repos
         let transactions: InMemoryTransactionRepository
 
@@ -20,18 +22,18 @@ struct UnclearTransactionTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
+            let transfers = InMemoryTransferRepository()
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            self.uow = uow
 
             // Repos
             self.transactions = transactions
 
             // Services
-            self.addTransaction = AddTransaction(
-                accountRepository: accounts,
-                transactionRepository: transactions
-            )
-            self.clearTransaction = ClearTransaction(transactionRepository: transactions)
-            self.reconcileTransaction = ReconcileTransaction(transactionRepository: transactions)
-            self.unclearTransaction = UnclearTransaction(transactionRepository: transactions)
+            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.clearTransaction = ClearTransaction(unitOfWork: uow)
+            self.reconcileTransaction = ReconcileTransaction(unitOfWork: uow)
+            self.unclearTransaction = UnclearTransaction(unitOfWork: uow)
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)

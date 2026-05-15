@@ -10,29 +10,28 @@ public struct CloseAccount: Sendable {
         self.todayProvider = todayProvider
     }
 
+    @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws {
         let today = todayProvider.today()
-        try await unitOfWork.perform { ctx in
-            guard var account = try await ctx.accounts.get(id: accountID) else {
-                throw ApplicationError.notFound
-            }
-            let transactions = try await ctx.transactions.forAccount(accountID)
-            let transfers = try await ctx.transfers.forAccount(accountID)
-            let balance = BalanceCalculator.balance(
-                transactions: transactions,
-                transfers: transfers,
-                accountID: accountID
-            )
-            if balance != 0 {
-                let zeroing = try Transaction.adjust(
-                    accountID: accountID,
-                    amount: -balance,
-                    date: today
-                )
-                try await ctx.transactions.save(zeroing)
-            }
-            try account.close()
-            try await ctx.accounts.save(account)
+        guard var account = try await ctx.accounts.get(id: accountID) else {
+            throw ApplicationError.notFound
         }
+        let transactions = try await ctx.transactions.forAccount(accountID)
+        let transfers = try await ctx.transfers.forAccount(accountID)
+        let balance = BalanceCalculator.balance(
+            transactions: transactions,
+            transfers: transfers,
+            accountID: accountID
+        )
+        if balance != 0 {
+            let zeroing = try Transaction.adjust(
+                accountID: accountID,
+                amount: -balance,
+                date: today
+            )
+            try await ctx.transactions.save(zeroing)
+        }
+        try account.close()
+        try await ctx.accounts.save(account)
     }
 }

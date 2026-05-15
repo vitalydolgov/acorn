@@ -33,12 +33,12 @@ struct ReopenAccountTests {
             self.accounts = accounts
 
             // Services
-            self.openAccount = OpenAccount(accountRepository: accounts)
+            self.openAccount = OpenAccount(unitOfWork: uow)
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
                 todayProvider: todayProvider
             )
-            self.reopenAccount = ReopenAccount(accountRepository: accounts)
+            self.reopenAccount = ReopenAccount(unitOfWork: uow)
         }
 
         var today: AcornDate { todayProvider.today() }

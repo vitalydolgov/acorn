@@ -6,6 +6,8 @@ import AcornDomain
 @Suite("UpdateTransaction")
 struct UpdateTransactionTests {
     private struct SUT {
+        let uow: InMemoryUnitOfWork
+
         // Repos
         let transactions: InMemoryTransactionRepository
 
@@ -18,16 +20,16 @@ struct UpdateTransactionTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
+            let transfers = InMemoryTransferRepository()
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            self.uow = uow
 
             // Repos
             self.transactions = transactions
 
             // Services
-            self.addTransaction = AddTransaction(
-                accountRepository: accounts,
-                transactionRepository: transactions
-            )
-            self.updateTransaction = UpdateTransaction(transactionRepository: transactions)
+            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.updateTransaction = UpdateTransaction(unitOfWork: uow)
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)

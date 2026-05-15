@@ -2,39 +2,32 @@ import Foundation
 import AcornDomain
 
 public struct RecordTransfer: Sendable {
-    private let accountRepository: any AccountRepository
-    private let transferRepository: any TransferRepository
+    private let unitOfWork: any UnitOfWork
 
-    public init(
-        accountRepository: any AccountRepository,
-        transferRepository: any TransferRepository
-    ) {
-        self.accountRepository = accountRepository
-        self.transferRepository = transferRepository
+    public init(unitOfWork: any UnitOfWork) {
+        self.unitOfWork = unitOfWork
     }
 
+    @UnitOfWork
     public func callAsFunction(
         fromAccountID: UUID,
         toAccountID: UUID,
         amount: Decimal,
         date: AcornDate
     ) async throws -> Transfer {
-        try await assertPostable(fromAccountID)
-        try await assertPostable(toAccountID)
+        for accountID in [fromAccountID, toAccountID] {
+            guard let account = try await ctx.accounts.get(id: accountID) else {
+                throw ApplicationError.notFound
+            }
+            try account.assertPostable()
+        }
         let transfer = try Transfer.create(
             fromAccountID: fromAccountID,
             toAccountID: toAccountID,
             amount: amount,
             date: date
         )
-        try await transferRepository.save(transfer)
+        try await ctx.transfers.save(transfer)
         return transfer
-    }
-
-    private func assertPostable(_ accountID: UUID) async throws {
-        guard let account = try await accountRepository.get(id: accountID) else {
-            throw ApplicationError.notFound
-        }
-        try account.assertPostable()
     }
 }

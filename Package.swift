@@ -1,5 +1,6 @@
 // swift-tools-version: 6.2
 import PackageDescription
+import CompilerPluginSupport
 
 let package = Package(
     name: "Acorn",
@@ -8,9 +9,23 @@ let package = Package(
         .library(name: "AcornDomain", targets: ["AcornDomain"]),
         .library(name: "AcornApplication", targets: ["AcornApplication"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0"),
+    ],
     targets: [
         .target(name: "AcornDomain"),
-        .target(name: "AcornApplication", dependencies: ["AcornDomain"]),
+        .macro(
+            name: "AcornMacros",
+            dependencies: [
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+            ]
+        ),
+        .target(
+            name: "AcornApplication",
+            dependencies: ["AcornDomain", "AcornMacros"]
+        ),
         .testTarget(
             name: "AcornDomainTests",
             dependencies: ["AcornDomain"]

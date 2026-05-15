@@ -20,6 +20,7 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 
 - `AcornDomain` — entities, value objects, repository protocols, domain logic.
 - `AcornApplication` — one type per use case, plus `UnitOfWork` for use cases that span aggregates.
+- `AcornMacros` — Macros that remove boilerplate from the application layer.
 
 ## Status
 

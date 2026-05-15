@@ -40,15 +40,9 @@ struct CloseAccountTests {
             self.transfers = transfers
 
             // Services
-            self.openAccount = OpenAccount(accountRepository: accounts)
-            self.addTransaction = AddTransaction(
-                accountRepository: accounts,
-                transactionRepository: transactions
-            )
-            self.recordTransfer = RecordTransfer(
-                accountRepository: accounts,
-                transferRepository: transfers
-            )
+            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransfer = RecordTransfer(unitOfWork: uow)
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
                 todayProvider: todayProvider

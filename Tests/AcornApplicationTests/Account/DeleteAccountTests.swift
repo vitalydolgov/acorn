@@ -6,6 +6,8 @@ import AcornDomain
 @Suite("DeleteAccount")
 struct DeleteAccountTests {
     private struct SUT {
+        let uow: InMemoryUnitOfWork
+
         // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
@@ -21,6 +23,8 @@ struct DeleteAccountTests {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
             let transfers = InMemoryTransferRepository()
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            self.uow = uow
 
             // Repos
             self.accounts = accounts
@@ -28,20 +32,10 @@ struct DeleteAccountTests {
             self.transfers = transfers
 
             // Services
-            self.openAccount = OpenAccount(accountRepository: accounts)
-            self.addTransaction = AddTransaction(
-                accountRepository: accounts,
-                transactionRepository: transactions
-            )
-            self.recordTransfer = RecordTransfer(
-                accountRepository: accounts,
-                transferRepository: transfers
-            )
-            self.deleteAccount = DeleteAccount(
-                accountRepository: accounts,
-                transactionRepository: transactions,
-                transferRepository: transfers
-            )
+            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransfer = RecordTransfer(unitOfWork: uow)
+            self.deleteAccount = DeleteAccount(unitOfWork: uow)
         }
     }
 
