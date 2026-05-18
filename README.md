@@ -1,6 +1,6 @@
 # Acorn
 
-A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped to the **domain** and **application** layers — no UI.
+A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped to the **domain** and **application** layers — no UI. Domain operations run through a **dual interface**: a human user (UI) and an LLM agent that invokes the same application use cases as tools.
 
 ## Goals
 
@@ -15,34 +15,24 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 - swift-tools 6.2
 - iOS 17 / macOS 14
 - Swift 6 (strict concurrency)
+- Anthropic API for the LLM agent
 
 ## Modules
 
 - `AcornDomain` — entities, value objects, repository protocols, domain logic.
 - `AcornApplication` — one type per use case, plus `UnitOfWork` for use cases that span aggregates.
 - `AcornMacros` — Macros that remove boilerplate from the application layer.
+- `AcornAgent` — exposes application use cases to an LLM as tools.
+- `AcornInMemory` — in-memory persistence implementation. Shared test store, not a production adapter.
 
 ## Status
 
-- [x] Basic account and transaction
-- [x] Account lifecycle: close, reopen, delete
-- [x] Open account
-- [x] Update account with validation
-- [x] Cleared and uncleared balance
-- [x] Transaction lifecycle: clear, unclear, reconcile, delete
-- [x] Deposit, withdraw and adjust transactions
-- [x] Update transaction with validation
-- [x] Transfers between accounts
-- [x] Transactional operations (Unit of Work for multi-aggregate use cases, with rollback)
-- [x] Aggregate versioning
-- [ ] Categories
-- [ ] Plans (zero-based monthly allocation)
-- [ ] Payees
-- [ ] Reconciliation flow
-- [ ] Undo stack
-- [ ] Domain events
-- [ ] Pagination
-- [ ] ...
+- [x] Accounts & transactions — full lifecycle, validation, balances
+- [x] Transfers & transactional integrity — Unit of Work, rollback, versioning
+- [x] LLM agent interface — application use cases exposed as tools
+- [ ] Budgeting core — categories, plans, payees
+- [ ] Reconciliation & undo
+- [ ] Scale & observability — domain events, pagination
 
 Persistence is intentionally out of scope: the library ships repository and `UnitOfWork` protocols, and the consuming app provides the adapter (Core Data, GRDB, SQLite, CloudKit, …) that fits its storage choice.
 

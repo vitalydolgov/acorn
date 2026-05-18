@@ -20,14 +20,6 @@ public enum BalanceCalculator {
         return total
     }
 
-    public static func balance(of transactions: some Sequence<Transaction>) -> Decimal {
-        var total: Decimal = 0
-        for tx in transactions where !tx.isDeleted {
-            total += tx.amount
-        }
-        return total
-    }
-
     public static func clearedBalance(of transactions: some Sequence<Transaction>) -> Decimal {
         var total: Decimal = 0
         for tx in transactions where !tx.isDeleted {

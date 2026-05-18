@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import AcornApplication
+import AcornInMemory
 import AcornDomain
 
 private struct InjectedFailure: Error, Equatable {}

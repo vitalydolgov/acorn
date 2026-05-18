@@ -8,9 +8,11 @@ let package = Package(
     products: [
         .library(name: "AcornDomain", targets: ["AcornDomain"]),
         .library(name: "AcornApplication", targets: ["AcornApplication"]),
+        .library(name: "AcornAgent", targets: ["AcornAgent"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-syntax.git", from: "600.0.0"),
+        .package(url: "https://github.com/mattt/JSONSchema.git", from: "1.3.1"),
     ],
     targets: [
         .target(name: "AcornDomain"),
@@ -26,13 +28,28 @@ let package = Package(
             name: "AcornApplication",
             dependencies: ["AcornDomain", "AcornMacros"]
         ),
+        .target(
+            name: "AcornAgent",
+            dependencies: [
+                "AcornApplication",
+                .product(name: "JSONSchema", package: "JSONSchema"),
+            ]
+        ),
+        .target(
+            name: "AcornInMemory",
+            dependencies: ["AcornDomain", "AcornApplication"]
+        ),
         .testTarget(
             name: "AcornDomainTests",
             dependencies: ["AcornDomain"]
         ),
         .testTarget(
             name: "AcornApplicationTests",
-            dependencies: ["AcornApplication"]
+            dependencies: ["AcornApplication", "AcornInMemory"]
+        ),
+        .testTarget(
+            name: "AcornAgentTests",
+            dependencies: ["AcornAgent", "AcornInMemory"]
         ),
     ],
     swiftLanguageModes: [.v6]

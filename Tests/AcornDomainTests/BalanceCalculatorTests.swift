@@ -30,7 +30,13 @@ struct BalanceCalculatorTests {
             reconciledDeposit,
             withdraw(30),
         ]
-        #expect(BalanceCalculator.balance(of: txs) == 145)
+        #expect(
+            BalanceCalculator.balance(
+                transactions: txs,
+                transfers: [Transfer](),
+                accountID: accountID
+            ) == 145
+        )
     }
 
     @Test("balance skips deleted transactions")
@@ -41,12 +47,24 @@ struct BalanceCalculatorTests {
             deposit(100),
             deletedDeposit,
         ]
-        #expect(BalanceCalculator.balance(of: txs) == 100)
+        #expect(
+            BalanceCalculator.balance(
+                transactions: txs,
+                transfers: [Transfer](),
+                accountID: accountID
+            ) == 100
+        )
     }
 
     @Test("balance of empty sequence is zero")
     func balanceOfEmptyIsZero() {
-        #expect(BalanceCalculator.balance(of: [Transaction]()) == 0)
+        #expect(
+            BalanceCalculator.balance(
+                transactions: [Transaction](),
+                transfers: [Transfer](),
+                accountID: accountID
+            ) == 0
+        )
     }
 
     // MARK: - clearedBalance
@@ -125,7 +143,11 @@ struct BalanceCalculatorTests {
             withdraw(30),
             deletedDeposit,
         ]
-        let total = BalanceCalculator.balance(of: txs)
+        let total = BalanceCalculator.balance(
+            transactions: txs,
+            transfers: [Transfer](),
+            accountID: accountID
+        )
         let cleared = BalanceCalculator.clearedBalance(of: txs)
         let uncleared = BalanceCalculator.unclearedBalance(of: txs)
         #expect(cleared + uncleared == total)

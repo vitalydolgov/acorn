@@ -1,23 +1,23 @@
 import Foundation
 import AcornDomain
-@testable import AcornApplication
+import AcornApplication
 
-final class InMemoryUnitOfWork: UnitOfWork, @unchecked Sendable {
-    private let accounts: InMemoryAccountRepository
-    private let transactions: InMemoryTransactionRepository
-    private let transfers: InMemoryTransferRepository
+public final class InMemoryUnitOfWork: UnitOfWork, @unchecked Sendable {
+    public let accounts: InMemoryAccountRepository
+    public let transactions: InMemoryTransactionRepository
+    public let transfers: InMemoryTransferRepository
 
-    init(
-        accounts: InMemoryAccountRepository,
-        transactions: InMemoryTransactionRepository,
-        transfers: InMemoryTransferRepository
+    public init(
+        accounts: InMemoryAccountRepository = InMemoryAccountRepository(),
+        transactions: InMemoryTransactionRepository = InMemoryTransactionRepository(),
+        transfers: InMemoryTransferRepository = InMemoryTransferRepository()
     ) {
         self.accounts = accounts
         self.transactions = transactions
         self.transfers = transfers
     }
 
-    func perform<T: Sendable>(
+    public func perform<T: Sendable>(
         _ body: @Sendable (any RepositoryContext) async throws -> T
     ) async throws -> T {
         let accountsSnap = accounts.accounts
