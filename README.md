@@ -12,9 +12,9 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 
 ## Tech stack
 
-- swift-tools 6.2
 - iOS 17 / macOS 14
-- Swift 6 (strict concurrency)
+- Swift 6.2 toolchain
+- Swift Testing
 - Anthropic API for the LLM agent
 
 ## Modules
@@ -24,6 +24,17 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 - `AcornMacros` — Macros that remove boilerplate from the application layer.
 - `AcornAgent` — exposes application use cases to an LLM as tools.
 - `AcornInMemory` — in-memory persistence implementation. Shared test store, not a production adapter.
+
+## Testing
+
+Test targets mirror the modules and suites are organized by aggregate to match the source layout, covering domain invariants, use cases against the in-memory store, and the agent tool wrappers.
+
+Integration tests run separately: they call the real Anthropic API, are gated off by default, and run only with `ACORN_LLM_TESTS=1` and an `ANTHROPIC_API_KEY` set.
+
+```sh
+swift test                       # offline suite
+ACORN_LLM_TESTS=1 swift test     # include paid live tests
+```
 
 ## Status
 

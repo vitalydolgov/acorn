@@ -7,8 +7,8 @@ import AcornInMemory
 
 /// Live tests that assert on the model's *judgment* rather than mechanics.
 /// A failure here signals prompt/tool-description quality, not a code bug.
-@Suite("LiveAnthropicJudgment", .tags(.integration))
-struct LiveAnthropicJudgmentTests {
+@Suite("LiveAccountToolsJudgment", .tags(.integration))
+struct LiveAccountToolsJudgmentTests {
     private func session(catalog: ToolCatalog) throws -> ChatSession {
         let key = try #require(
             ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"],

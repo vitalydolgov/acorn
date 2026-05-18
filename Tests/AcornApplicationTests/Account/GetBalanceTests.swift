@@ -24,49 +24,60 @@ struct GetBalanceTests {
         }
     }
 
-    @Test("returns zero for a new account")
+    @Test("returns zero balances for a new account")
     func zero() async throws {
         let sut = SUT()
         let account = try Account.make(name: "Checking", notes: "")
         try await sut.accounts.save(account)
 
-        let balance = try await sut.getBalance(accountID: account.id)
-        #expect(balance == 0)
+        let balances = try await sut.getBalance(accountID: account.id)
+        #expect(balances == GetBalance.Balances(cleared: 0, uncleared: 0, working: 0))
     }
 
-    @Test("sums non-deleted transactions on the account")
-    func sumsTransactions() async throws {
+    @Test("splits cleared and uncleared transactions and sums the working balance")
+    func splitsByStatus() async throws {
         let sut = SUT()
         let account = try Account.make(name: "Checking", notes: "")
         try await sut.accounts.save(account)
-        try await sut.transactions.save(
-            Transaction.add(accountID: account.id, amount: 100, date: .today())
-        )
+
+        var clearedDeposit = Transaction.add(accountID: account.id, amount: 100, date: .today())
+        try clearedDeposit.clear()
+        try await sut.transactions.save(clearedDeposit)
         try await sut.transactions.save(
             Transaction.add(accountID: account.id, amount: -30, date: .today())
         )
 
-        let balance = try await sut.getBalance(accountID: account.id)
-        #expect(balance == 70)
+        let balances = try await sut.getBalance(accountID: account.id)
+        #expect(balances.cleared == 100)
+        #expect(balances.uncleared == -30)
+        #expect(balances.working == 70)
     }
 
-    @Test("applies transfers in the correct direction")
+    @Test("applies transfers in the correct direction with per-side status")
     func transfers() async throws {
         let sut = SUT()
         let checking = try Account.make(name: "Checking", notes: "")
         let savings = try Account.make(name: "Savings", notes: "")
         try await sut.accounts.save(checking)
         try await sut.accounts.save(savings)
-        let transfer = try Transfer.create(
+        var transfer = try Transfer.create(
             fromAccountID: checking.id,
             toAccountID: savings.id,
             amount: 50,
             date: .today()
         )
+        try transfer.clear(side: .from)
         try await sut.transfers.save(transfer)
 
-        #expect(try await sut.getBalance(accountID: checking.id) == -50)
-        #expect(try await sut.getBalance(accountID: savings.id) == 50)
+        let checkingBalances = try await sut.getBalance(accountID: checking.id)
+        #expect(checkingBalances.cleared == -50)
+        #expect(checkingBalances.uncleared == 0)
+        #expect(checkingBalances.working == -50)
+
+        let savingsBalances = try await sut.getBalance(accountID: savings.id)
+        #expect(savingsBalances.cleared == 0)
+        #expect(savingsBalances.uncleared == 50)
+        #expect(savingsBalances.working == 50)
     }
 
     @Test("throws notFound when the account does not exist")

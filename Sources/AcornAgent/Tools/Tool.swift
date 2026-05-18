@@ -4,23 +4,23 @@ import JSONSchema
 public struct Tool: Sendable {
     public let name: String
     public let description: String
-    public let inputSchema: JSONSchema
+    public let schema: JSONSchema
     public let invoke: @Sendable (JSONValue) async throws -> JSONValue
 
     public init(
         name: String,
         description: String,
-        inputSchema: JSONSchema,
+        schema: JSONSchema,
         invoke: @Sendable @escaping (JSONValue) async throws -> JSONValue
     ) {
         self.name = name
         self.description = description
-        self.inputSchema = inputSchema
+        self.schema = schema
         self.invoke = invoke
     }
 
     public var descriptor: ToolDescriptor {
-        ToolDescriptor(name: name, description: description, inputSchema: inputSchema)
+        ToolDescriptor(name: name, description: description, schema: schema)
     }
 }
 
@@ -39,7 +39,7 @@ public actor ToolCatalog {
             .sorted { $0.name < $1.name }
     }
 
-    public func dispatch(name: String, args: JSONValue) async -> ToolOutcome {
+    public func dispatch(name: String, args: JSONValue) async -> ToolResult {
         guard let tool = tools[name] else {
             return .failure(.object(["error": .string("unknown tool: \(name)")]))
         }
@@ -51,7 +51,7 @@ public actor ToolCatalog {
     }
 }
 
-public enum ToolOutcome: Sendable {
+public enum ToolResult: Sendable {
     case success(JSONValue)
     case failure(JSONValue)
 

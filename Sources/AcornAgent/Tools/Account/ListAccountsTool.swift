@@ -8,10 +8,12 @@ extension Tool {
             name: "list_accounts",
             description: """
                 List all non-deleted accounts (open and closed), with id, name, \
-                and is_closed flag. Use this to discover what accounts exist or \
-                to resolve a name when get_account_id reports ambiguity.
+                notes, and is_closed flag. Use this to discover what accounts \
+                exist, to resolve a name when get_account_id reports ambiguity, \
+                or to find an account by its notes/description when the user \
+                refers to it by purpose or by a rule kept in its notes.
                 """,
-            inputSchema: .object(properties: [:], required: []),
+            schema: .object(properties: [:], required: []),
             invoke: { _ in
                 let accounts = try await command()
                 let dtos = accounts.map(AccountDTO.init(from:))

@@ -14,7 +14,7 @@ extension Tool {
                 candidates if multiple accounts share the name — ask the user to \
                 disambiguate in that case. Errors when no account matches.
                 """,
-            inputSchema: .object(
+            schema: .object(
                 properties: [
                     "name": .string(description: "Account name to look up.")
                 ],

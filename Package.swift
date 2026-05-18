@@ -51,6 +51,5 @@ let package = Package(
             name: "AcornAgentTests",
             dependencies: ["AcornAgent", "AcornInMemory"]
         ),
-    ],
-    swiftLanguageModes: [.v6]
+    ]
 )

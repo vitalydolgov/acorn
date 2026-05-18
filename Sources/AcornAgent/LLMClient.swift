@@ -59,23 +59,6 @@ public struct CacheControl: Codable, Sendable {
     public static let ephemeral = CacheControl(type: "ephemeral")
 }
 
-public struct ToolDescriptor: Encodable, Sendable {
-    public let name: String
-    public let description: String
-    public let inputSchema: JSONSchema
-
-    public init(name: String, description: String, inputSchema: JSONSchema) {
-        self.name = name
-        self.description = description
-        self.inputSchema = inputSchema
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case name, description
-        case inputSchema = "input_schema"
-    }
-}
-
 public struct Message: Codable, Sendable {
     public let role: Role
     public let content: [ContentBlock]

@@ -8,15 +8,17 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func getBalance(_ command: GetBalance) -> Tool {
+    public static func getAccount(_ command: GetAccount) -> Tool {
         Tool(
-            name: "get_balance",
+            name: "get_account",
             description: """
-                Compute the current balance for an account — the sum of all \
-                non-deleted transactions plus net transfers in and out. The \
-                balance is returned as a decimal string to preserve precision.
+                Get full information for a single account by id: name, notes, \
+                and whether it is closed. Notes are a free-form description \
+                that may contain user-defined rules not modelled elsewhere — \
+                read them when the user refers to an account by what it is for. \
+                Obtain the id via get_account_id or list_accounts.
                 """,
-            inputSchema: .object(
+            schema: .object(
                 properties: [
                     "account_id": .string(
                         description: "UUID of the account. Obtain via get_account_id or list_accounts.",
@@ -28,10 +30,9 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                let balance = try await command(accountID: input.accountID)
-                return .object([
-                    "balance": .string(NSDecimalNumber(decimal: balance).stringValue)
-                ])
+                let account = try await command(accountID: input.accountID)
+                let json = try JSONEncoder().encode(AccountDTO(from: account))
+                return try JSONDecoder().decode(JSONValue.self, from: json)
             }
         )
     }

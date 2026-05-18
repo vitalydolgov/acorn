@@ -5,8 +5,8 @@ import AcornApplication
 import AcornInMemory
 @testable import AcornAgent
 
-@Suite("LiveAnthropic", .tags(.integration))
-struct LiveAnthropicTests {
+@Suite("LiveAccountTools", .tags(.integration))
+struct LiveAccountToolsTests {
     private func session(catalog: ToolCatalog) throws -> ChatSession {
         let key = try #require(
             ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"],
@@ -71,6 +71,28 @@ struct LiveAnthropicTests {
             #expect(idIdx < balIdx)
         }
         #expect(reply.contains("250"))
+    }
+
+    @Test("real model partially updates an account without reading it first", .requiresLLM)
+    func partiallyUpdatesAccount() async throws {
+        let uow = InMemoryUnitOfWork()
+        let checking = try Account.make(name: "Checking", notes: "primary spending")
+        try await uow.accounts.save(checking)
+
+        let catalog = ToolCatalog()
+        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
+        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+
+        let session = try session(catalog: catalog)
+        _ = try await session.send("Rename my Checking account to Everyday.")
+
+        let names = await toolNames(session)
+        #expect(names.contains("update_account"))
+        #expect(!names.contains("get_account"))
+
+        let stored = try await uow.accounts.get(id: checking.id)
+        #expect(stored?.name == "Everyday")
+        #expect(stored?.notes == "primary spending")
     }
 
 }

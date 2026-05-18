@@ -9,11 +9,19 @@ public struct UpdateAccount: Sendable {
     }
 
     @UnitOfWork
-    public func callAsFunction(accountID: UUID, name: String, notes: String) async throws {
+    public func callAsFunction(
+        accountID: UUID,
+        name: String? = nil,
+        notes: String? = nil
+    ) async throws {
+        guard name != nil || notes != nil else { return }
         guard var account = try await ctx.accounts.get(id: accountID) else {
             throw ApplicationError.notFound
         }
-        try account.update(name: name, notes: notes)
+        try account.update(
+            name: name ?? account.name,
+            notes: notes ?? account.notes
+        )
         try await ctx.accounts.save(account)
     }
 }

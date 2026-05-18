@@ -35,13 +35,13 @@ struct UpdateAccountTests {
     @Test("updates name and notes")
     func updatesNameAndNotes() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Old", notes: "Old notes")
+        let account = try await sut.openAccount(name: "Old", notes: "old notes")
 
-        try await sut.updateAccount(accountID: account.id, name: "New", notes: "New notes")
+        try await sut.updateAccount(accountID: account.id, name: "New", notes: "new notes")
 
         let stored = try await sut.accounts.get(id: account.id)
         #expect(stored?.name == "New")
-        #expect(stored?.notes == "New notes")
+        #expect(stored?.notes == "new notes")
     }
 
     @Test("fails for unknown account")
@@ -76,5 +76,55 @@ struct UpdateAccountTests {
         }
         let stored = try await sut.accounts.get(id: account.id)
         #expect(stored?.name == "Old")
+    }
+
+    @Test("updating notes only leaves the name unchanged")
+    func notesOnlyPreservesName() async throws {
+        let sut = SUT()
+        let account = try await sut.openAccount(name: "Salary", notes: "old rule")
+
+        try await sut.updateAccount(accountID: account.id, notes: "new rule")
+
+        let stored = try await sut.accounts.get(id: account.id)
+        #expect(stored?.name == "Salary")
+        #expect(stored?.notes == "new rule")
+    }
+
+    @Test("updating name only leaves the notes unchanged")
+    func nameOnlyPreservesNotes() async throws {
+        let sut = SUT()
+        let account = try await sut.openAccount(name: "Old", notes: "keep me")
+
+        try await sut.updateAccount(accountID: account.id, name: "New")
+
+        let stored = try await sut.accounts.get(id: account.id)
+        #expect(stored?.name == "New")
+        #expect(stored?.notes == "keep me")
+    }
+
+    @Test("an explicit empty notes string clears the notes")
+    func emptyStringClearsNotes() async throws {
+        let sut = SUT()
+        let account = try await sut.openAccount(name: "Acct", notes: "has rules")
+
+        try await sut.updateAccount(accountID: account.id, notes: "")
+
+        let stored = try await sut.accounts.get(id: account.id)
+        #expect(stored?.name == "Acct")
+        #expect(stored?.notes == "")
+    }
+
+    @Test("is a no-op when neither name nor notes is provided")
+    func noOpWhenNothingProvided() async throws {
+        let sut = SUT()
+        let account = try await sut.openAccount(name: "Old", notes: "keep")
+        let before = try await sut.accounts.get(id: account.id)
+
+        try await sut.updateAccount(accountID: account.id)
+
+        let stored = try await sut.accounts.get(id: account.id)
+        #expect(stored?.name == "Old")
+        #expect(stored?.notes == "keep")
+        #expect(stored?.version == before?.version)
     }
 }
