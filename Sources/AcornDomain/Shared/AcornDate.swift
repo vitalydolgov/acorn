@@ -1,9 +1,11 @@
 import Foundation
 
-public struct AcornDate: Sendable, Comparable {
+public struct AcornDate: Codable, Comparable, Sendable {
     public let year: Int
     public let month: Int
     public let day: Int
+
+    private enum CodingKeys: String, CodingKey { case year, month, day }
 
     public init?(year: Int, month: Int, day: Int) {
         var components = DateComponents()
@@ -16,6 +18,22 @@ public struct AcornDate: Sendable, Comparable {
         self.year = year
         self.month = month
         self.day = day
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let year = try c.decode(Int.self, forKey: .year)
+        let month = try c.decode(Int.self, forKey: .month)
+        let day = try c.decode(Int.self, forKey: .day)
+        guard let valid = AcornDate(year: year, month: month, day: day) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Invalid AcornDate \(year)-\(month)-\(day)"
+                )
+            )
+        }
+        self = valid
     }
 
     public static func today(now: Date = Date(), timeZone: TimeZone = .current) -> AcornDate {

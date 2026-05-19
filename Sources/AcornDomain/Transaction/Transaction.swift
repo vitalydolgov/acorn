@@ -10,39 +10,6 @@ public struct Transaction: Versioned, Sendable {
     public let kind: TransactionKind
     public private(set) var isDeleted: Bool = false
 
-    public static func add(
-        accountID: UUID,
-        amount: Decimal,
-        date: AcornDate
-    ) -> Transaction {
-        Transaction(
-            id: UUID(),
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: .uncleared,
-            kind: .regular
-        )
-    }
-
-    public static func adjust(
-        accountID: UUID,
-        amount: Decimal,
-        date: AcornDate
-    ) throws -> Transaction {
-        guard amount != 0 else {
-            throw DomainError.invalidArgument("amount must be non-zero")
-        }
-        return Transaction(
-            id: UUID(),
-            accountID: accountID,
-            amount: amount,
-            date: date,
-            status: .uncleared,
-            kind: .adjustment
-        )
-    }
-
     public static func rehydrate(
         id: UUID,
         version: Int,
@@ -65,22 +32,55 @@ public struct Transaction: Versioned, Sendable {
         )
     }
 
-    public mutating func update(amount: Decimal, date: AcornDate) throws {
+    package static func add(
+        accountID: UUID,
+        amount: Decimal,
+        date: AcornDate
+    ) -> Transaction {
+        Transaction(
+            id: UUID(),
+            accountID: accountID,
+            amount: amount,
+            date: date,
+            status: .uncleared,
+            kind: .regular
+        )
+    }
+
+    package static func adjust(
+        accountID: UUID,
+        amount: Decimal,
+        date: AcornDate
+    ) throws -> Transaction {
+        guard amount != 0 else {
+            throw DomainError.invalidArgument("amount must be non-zero")
+        }
+        return Transaction(
+            id: UUID(),
+            accountID: accountID,
+            amount: amount,
+            date: date,
+            status: .uncleared,
+            kind: .adjustment
+        )
+    }
+
+    package mutating func update(amount: Decimal, date: AcornDate) throws {
         guard !isDeleted else { throw DomainError.deleted }
         self.amount = amount
         self.date = date
     }
 
-    public mutating func delete() throws {
+    package mutating func delete() throws {
         guard !isDeleted else { throw DomainError.deleted }
         isDeleted = true
     }
 
-    public mutating func undelete() {
+    package mutating func undelete() {
         isDeleted = false
     }
 
-    public mutating func reconcile() throws {
+    package mutating func reconcile() throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard status == .cleared else {
             throw DomainError.invalidState("transaction is not cleared")
@@ -88,7 +88,7 @@ public struct Transaction: Versioned, Sendable {
         status = .reconciled
     }
 
-    public mutating func clear() throws {
+    package mutating func clear() throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard status == .uncleared else {
             throw DomainError.invalidState("transaction is not uncleared")
@@ -96,7 +96,7 @@ public struct Transaction: Versioned, Sendable {
         status = .cleared
     }
 
-    public mutating func unclear() throws {
+    package mutating func unclear() throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard status == .cleared else {
             throw DomainError.invalidState("transaction is not cleared")
@@ -105,11 +105,11 @@ public struct Transaction: Versioned, Sendable {
     }
 }
 
-public enum TransactionStatus: Sendable {
+public enum TransactionStatus: Codable, Sendable {
     case uncleared, cleared, reconciled
 }
 
-public enum TransactionKind: Sendable, Equatable {
+public enum TransactionKind: Codable, Equatable, Sendable {
     case regular
     case adjustment
 }

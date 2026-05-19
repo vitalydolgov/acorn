@@ -11,30 +11,6 @@ public struct Transfer: Versioned, Sendable {
     public private(set) var toStatus: TransactionStatus
     public private(set) var isDeleted: Bool
 
-    public static func create(
-        fromAccountID: UUID,
-        toAccountID: UUID,
-        amount: Decimal,
-        date: AcornDate
-    ) throws -> Transfer {
-        guard fromAccountID != toAccountID else {
-            throw DomainError.invalidArgument("source and destination must differ")
-        }
-        guard amount > 0 else {
-            throw DomainError.invalidArgument("amount must be positive")
-        }
-        return Transfer(
-            id: UUID(),
-            fromAccountID: fromAccountID,
-            toAccountID: toAccountID,
-            amount: amount,
-            date: date,
-            fromStatus: .uncleared,
-            toStatus: .uncleared,
-            isDeleted: false
-        )
-    }
-
     public static func rehydrate(
         id: UUID,
         version: Int,
@@ -59,7 +35,31 @@ public struct Transfer: Versioned, Sendable {
         )
     }
 
-    public mutating func update(amount: Decimal, date: AcornDate) throws {
+    package static func create(
+        fromAccountID: UUID,
+        toAccountID: UUID,
+        amount: Decimal,
+        date: AcornDate
+    ) throws -> Transfer {
+        guard fromAccountID != toAccountID else {
+            throw DomainError.invalidArgument("source and destination must differ")
+        }
+        guard amount > 0 else {
+            throw DomainError.invalidArgument("amount must be positive")
+        }
+        return Transfer(
+            id: UUID(),
+            fromAccountID: fromAccountID,
+            toAccountID: toAccountID,
+            amount: amount,
+            date: date,
+            fromStatus: .uncleared,
+            toStatus: .uncleared,
+            isDeleted: false
+        )
+    }
+
+    package mutating func update(amount: Decimal, date: AcornDate) throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard amount > 0 else {
             throw DomainError.invalidArgument("amount must be positive")
@@ -68,57 +68,65 @@ public struct Transfer: Versioned, Sendable {
         self.date = date
     }
 
-    public mutating func clear(side: TransferSide) throws {
+    package mutating func clear(side: TransferSide) throws {
         guard !isDeleted else { throw DomainError.deleted }
-        try mutateStatus(side: side) { status in
-            guard status == .uncleared else {
+        switch side {
+        case .from:
+            guard fromStatus == .uncleared else {
                 throw DomainError.invalidState("transfer side is not uncleared")
             }
-            status = .cleared
+            fromStatus = .cleared
+        case .to:
+            guard toStatus == .uncleared else {
+                throw DomainError.invalidState("transfer side is not uncleared")
+            }
+            toStatus = .cleared
         }
     }
 
-    public mutating func unclear(side: TransferSide) throws {
+    package mutating func unclear(side: TransferSide) throws {
         guard !isDeleted else { throw DomainError.deleted }
-        try mutateStatus(side: side) { status in
-            guard status == .cleared else {
+        switch side {
+        case .from:
+            guard fromStatus == .cleared else {
                 throw DomainError.invalidState("transfer side is not cleared")
             }
-            status = .uncleared
-        }
-    }
-
-    public mutating func reconcile(side: TransferSide) throws {
-        guard !isDeleted else { throw DomainError.deleted }
-        try mutateStatus(side: side) { status in
-            guard status == .cleared else {
+            fromStatus = .uncleared
+        case .to:
+            guard toStatus == .cleared else {
                 throw DomainError.invalidState("transfer side is not cleared")
             }
-            status = .reconciled
+            toStatus = .uncleared
         }
     }
 
-    public mutating func delete() throws {
+    package mutating func reconcile(side: TransferSide) throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        switch side {
+        case .from:
+            guard fromStatus == .cleared else {
+                throw DomainError.invalidState("transfer side is not cleared")
+            }
+            fromStatus = .reconciled
+        case .to:
+            guard toStatus == .cleared else {
+                throw DomainError.invalidState("transfer side is not cleared")
+            }
+            toStatus = .reconciled
+        }
+    }
+
+    package mutating func delete() throws {
         guard !isDeleted else { throw DomainError.deleted }
         isDeleted = true
     }
 
-    public mutating func undelete() {
+    package mutating func undelete() {
         isDeleted = false
-    }
-
-    private mutating func mutateStatus(
-        side: TransferSide,
-        _ body: (inout TransactionStatus) throws -> Void
-    ) throws {
-        switch side {
-        case .from: try body(&fromStatus)
-        case .to:   try body(&toStatus)
-        }
     }
 }
 
-public enum TransferSide: Sendable, Equatable {
+public enum TransferSide: Sendable {
     case from
     case to
 }

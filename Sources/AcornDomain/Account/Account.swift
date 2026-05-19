@@ -8,22 +8,6 @@ public struct Account: Versioned, Sendable {
     public private(set) var isClosed: Bool = false
     public private(set) var isDeleted: Bool = false
 
-    public func assertPostable() throws {
-        guard !isDeleted else { throw DomainError.deleted }
-        guard !isClosed else { throw DomainError.invalidState("account is closed") }
-    }
-
-    public static func make(name: String, notes: String) throws -> Account {
-        guard let name = AccountValidation.normalizedName(name) else {
-            throw DomainError.invalidArgument("name must not be blank")
-        }
-        return Account(
-            id: UUID(),
-            name: name,
-            notes: notes
-        )
-    }
-
     public static func rehydrate(
         id: UUID,
         version: Int,
@@ -42,19 +26,35 @@ public struct Account: Versioned, Sendable {
         )
     }
 
-    public mutating func close() throws {
+    package func assertPostable() throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard !isClosed else { throw DomainError.invalidState("account is closed") }
+    }
+
+    package static func make(name: String, notes: String) throws -> Account {
+        guard let name = AccountValidation.normalizedName(name) else {
+            throw DomainError.invalidArgument("name must not be blank")
+        }
+        return Account(
+            id: UUID(),
+            name: name,
+            notes: notes
+        )
+    }
+
+    package mutating func close() throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard !isClosed else { throw DomainError.invalidState("account is already closed") }
         isClosed = true
     }
 
-    public mutating func reopen() throws {
+    package mutating func reopen() throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard isClosed else { throw DomainError.invalidState("account is not closed") }
         isClosed = false
     }
 
-    public mutating func update(name: String, notes: String) throws {
+    package mutating func update(name: String, notes: String) throws {
         guard !isDeleted else { throw DomainError.deleted }
         guard let normalized = AccountValidation.normalizedName(name) else {
             throw DomainError.invalidArgument("name must not be blank")
@@ -63,12 +63,12 @@ public struct Account: Versioned, Sendable {
         self.notes = notes
     }
 
-    public mutating func delete() throws {
+    package mutating func delete() throws {
         guard !isDeleted else { throw DomainError.deleted }
         isDeleted = true
     }
 
-    public mutating func undelete() {
+    package mutating func undelete() {
         isDeleted = false
     }
 }
