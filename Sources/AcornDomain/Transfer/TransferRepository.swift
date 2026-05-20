@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol TransferRepository: Sendable {
+public protocol TransferRepository {
     func get(id: UUID) async throws -> Transfer?
     func forAccount(_ accountID: UUID) async throws -> [Transfer]
     func save(_ transfer: Transfer) async throws

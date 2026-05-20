@@ -1,15 +1,20 @@
 import Foundation
 import AcornDomain
 
-public protocol RepositoryContext: Sendable {
+public protocol RepositoryContext {
     var accounts: any AccountRepository { get }
     var transactions: any TransactionRepository { get }
     var transfers: any TransferRepository { get }
 }
 
+/// A single transactional scope over the repositories.
 public protocol UnitOfWork: Sendable {
+    /// Runs `body` in one transactional scope, commits on success.
+    ///
+    /// `body` is intentionally not `@Sendable`: concurrent `perform` calls on
+    /// the same instance are the caller's responsibility to avoid.
     func perform<T: Sendable>(
-        _ body: @Sendable (any RepositoryContext) async throws -> T
+        _ body: (any RepositoryContext) async throws -> T
     ) async throws -> T
 }
 

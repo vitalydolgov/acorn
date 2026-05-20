@@ -18,7 +18,7 @@ public final class InMemoryUnitOfWork: UnitOfWork, @unchecked Sendable {
     }
 
     public func perform<T: Sendable>(
-        _ body: @Sendable (any RepositoryContext) async throws -> T
+        _ body: (any RepositoryContext) async throws -> T
     ) async throws -> T {
         let accountsSnap = accounts.accounts
         let transactionsSnap = transactions.transactions
