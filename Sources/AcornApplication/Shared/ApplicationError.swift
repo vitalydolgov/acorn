@@ -5,4 +5,5 @@ public enum ApplicationError: Error, Sendable, Equatable {
     case notFound(name: String)
     case invalidArgument(String)
     case invalidState(String)
+    case policyViolation(String)
 }

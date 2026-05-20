@@ -15,11 +15,12 @@ public struct DeleteAccount: Sendable {
         }
         let transactions = try await ctx.transactions.forAccount(accountID)
         let transfers = try await ctx.transfers.forAccount(accountID)
-        if transactions.contains(where: { !$0.isDeleted }) {
-            throw ApplicationError.invalidState("account has live transactions")
-        }
-        if transfers.contains(where: { !$0.isDeleted }) {
-            throw ApplicationError.invalidState("account is referenced by live transfers")
+        guard AccountPolicy.canDelete(
+            accountID: accountID,
+            transactions: transactions,
+            transfers: transfers
+        ) else {
+            throw ApplicationError.policyViolation("account cannot be deleted")
         }
         try account.delete()
         try await ctx.accounts.save(account)

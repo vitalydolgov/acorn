@@ -18,6 +18,7 @@ struct DeleteAccountTests {
         let openAccount: OpenAccount
         let addTransaction: AddTransaction
         let recordTransfer: RecordTransfer
+        let closeAccount: CloseAccount
         let deleteAccount: DeleteAccount
 
         init() {
@@ -36,6 +37,10 @@ struct DeleteAccountTests {
             self.openAccount = OpenAccount(unitOfWork: uow)
             self.addTransaction = AddTransaction(unitOfWork: uow)
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
+            self.closeAccount = CloseAccount(
+                unitOfWork: uow,
+                todayProvider: FixedTodayProvider(date: .today())
+            )
             self.deleteAccount = DeleteAccount(unitOfWork: uow)
         }
     }
@@ -60,15 +65,28 @@ struct DeleteAccountTests {
         #expect(stored.isDeleted == true)
     }
 
-    @Test("blocked when regular transactions exist")
-    func blockedByTransactions() async throws {
+    @Test("blocked when balance is non-zero")
+    func blockedByNonZeroBalance() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
         _ = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
 
-        await #expect(throws: ApplicationError.self) {
+        await #expect(throws: ApplicationError.policyViolation("account cannot be deleted")) {
             try await sut.deleteAccount(accountID: account.id)
         }
+    }
+
+    @Test("allowed after close zeros the balance")
+    func allowedAfterClose() async throws {
+        let sut = SUT()
+        let account = try await sut.openAccount(name: "A")
+        _ = try await sut.addTransaction(accountID: account.id, amount: 100, date: .today())
+        try await sut.closeAccount(accountID: account.id)
+
+        try await sut.deleteAccount(accountID: account.id)
+
+        let stored = try #require(try await sut.accounts.get(id: account.id))
+        #expect(stored.isDeleted == true)
     }
 
     @Test("blocked when a transfer references the account")
@@ -83,7 +101,7 @@ struct DeleteAccountTests {
             date: .today()
         )
 
-        await #expect(throws: ApplicationError.self) {
+        await #expect(throws: ApplicationError.policyViolation("account cannot be deleted")) {
             try await sut.deleteAccount(accountID: account.id)
         }
     }
