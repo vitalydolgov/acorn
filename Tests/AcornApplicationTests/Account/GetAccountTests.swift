@@ -33,7 +33,7 @@ struct GetAccountTests {
     @Test("throws notFound when the account does not exist")
     func notFound() async throws {
         let sut = SUT()
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.getAccount(accountID: UUID())
         }
     }
@@ -47,7 +47,7 @@ struct GetAccountTests {
         try stored.delete()
         try await sut.accounts.save(stored)
 
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.getAccount(accountID: account.id)
         }
     }

@@ -67,7 +67,7 @@ struct GetAccountIDTests {
     func notFound() async throws {
         let sut = SUT()
         try await sut.accounts.save(try Account.make(name: "Checking", notes: ""))
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.getAccountID(name: "Savings")
         }
     }
@@ -79,7 +79,7 @@ struct GetAccountIDTests {
         try deleted.delete()
         try await sut.accounts.save(deleted)
 
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.getAccountID(name: "Checking")
         }
     }

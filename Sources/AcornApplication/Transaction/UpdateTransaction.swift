@@ -11,7 +11,7 @@ public struct UpdateTransaction: Sendable {
     @UnitOfWork
     public func callAsFunction(transactionID: UUID, amount: Decimal, date: AcornDate) async throws {
         guard var transaction = try await ctx.transactions.get(id: transactionID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(transactionID)
         }
         try transaction.update(amount: amount, date: date)
         try await ctx.transactions.save(transaction)

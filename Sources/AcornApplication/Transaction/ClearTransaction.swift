@@ -11,7 +11,7 @@ public struct ClearTransaction: Sendable {
     @UnitOfWork
     public func callAsFunction(transactionID: UUID) async throws {
         guard var transaction = try await ctx.transactions.get(id: transactionID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(transactionID)
         }
         try transaction.clear()
         try await ctx.transactions.save(transaction)

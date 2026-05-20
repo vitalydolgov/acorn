@@ -14,7 +14,7 @@ public struct CloseAccount: Sendable {
     public func callAsFunction(accountID: UUID) async throws {
         let today = todayProvider.today()
         guard var account = try await ctx.accounts.get(id: accountID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(accountID)
         }
         let transactions = try await ctx.transactions.forAccount(accountID)
         let transfers = try await ctx.transfers.forAccount(accountID)

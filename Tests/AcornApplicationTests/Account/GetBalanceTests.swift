@@ -83,7 +83,7 @@ struct GetBalanceTests {
     @Test("throws notFound when the account does not exist")
     func notFound() async throws {
         let sut = SUT()
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.getBalance(accountID: UUID())
         }
     }

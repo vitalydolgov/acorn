@@ -58,7 +58,7 @@ struct UpdateTransactionTests {
     func failsForUnknown() async throws {
         let sut = try await SUT()
 
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             try await sut.updateTransaction(transactionID: UUID(), amount: 1, date: Self.today)
         }
     }

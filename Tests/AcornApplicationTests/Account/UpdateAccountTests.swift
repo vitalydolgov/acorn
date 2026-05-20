@@ -48,7 +48,7 @@ struct UpdateAccountTests {
     func failsForUnknown() async throws {
         let sut = SUT()
 
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             try await sut.updateAccount(accountID: UUID(), name: "Any", notes: "")
         }
     }

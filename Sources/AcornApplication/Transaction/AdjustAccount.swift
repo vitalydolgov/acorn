@@ -11,7 +11,7 @@ public struct AdjustAccount: Sendable {
     @UnitOfWork
     public func callAsFunction(accountID: UUID, amount: Decimal, date: AcornDate) async throws -> Transaction {
         guard let account = try await ctx.accounts.get(id: accountID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(accountID)
         }
         try account.assertPostable()
         let transaction = try Transaction.adjust(accountID: accountID, amount: amount, date: date)

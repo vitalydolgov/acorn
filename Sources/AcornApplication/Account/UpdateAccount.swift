@@ -16,7 +16,7 @@ public struct UpdateAccount: Sendable {
     ) async throws {
         guard name != nil || notes != nil else { return }
         guard var account = try await ctx.accounts.get(id: accountID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(accountID)
         }
         try account.update(
             name: name ?? account.name,

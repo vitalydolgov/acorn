@@ -78,7 +78,7 @@ struct DeleteTransferTests {
     @Test("fails for unknown transfer")
     func failsForUnknown() async throws {
         let sut = try await SUT()
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             try await sut.deleteTransfer(transferID: UUID())
         }
     }

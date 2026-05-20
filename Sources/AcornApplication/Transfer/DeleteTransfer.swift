@@ -11,7 +11,7 @@ public struct DeleteTransfer: Sendable {
     @UnitOfWork
     public func callAsFunction(transferID: UUID) async throws {
         guard var transfer = try await ctx.transfers.get(id: transferID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(transferID)
         }
         try transfer.delete()
         try await ctx.transfers.save(transfer)

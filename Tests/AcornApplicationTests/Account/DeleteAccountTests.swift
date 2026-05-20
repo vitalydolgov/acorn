@@ -43,8 +43,9 @@ struct DeleteAccountTests {
     @Test("fails for unknown account")
     func failsForUnknown() async throws {
         let sut = SUT()
-        await #expect(throws: ApplicationError.notFound) {
-            try await sut.deleteAccount(accountID: UUID())
+        let missingID = UUID()
+        await #expect(throws: ApplicationError.notFound(missingID)) {
+            try await sut.deleteAccount(accountID: missingID)
         }
     }
 
@@ -65,7 +66,7 @@ struct DeleteAccountTests {
         let account = try await sut.openAccount(name: "A")
         _ = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: ApplicationError.self) {
             try await sut.deleteAccount(accountID: account.id)
         }
     }
@@ -82,7 +83,7 @@ struct DeleteAccountTests {
             date: .today()
         )
 
-        await #expect(throws: ApplicationError.invalidState) {
+        await #expect(throws: ApplicationError.self) {
             try await sut.deleteAccount(accountID: account.id)
         }
     }

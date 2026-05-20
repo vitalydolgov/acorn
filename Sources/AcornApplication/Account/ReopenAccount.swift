@@ -11,7 +11,7 @@ public struct ReopenAccount: Sendable {
     @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws {
         guard var account = try await ctx.accounts.get(id: accountID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(accountID)
         }
         try account.reopen()
         try await ctx.accounts.save(account)

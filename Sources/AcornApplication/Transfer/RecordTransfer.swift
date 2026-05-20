@@ -17,7 +17,7 @@ public struct RecordTransfer: Sendable {
     ) async throws -> Transfer {
         for accountID in [fromAccountID, toAccountID] {
             guard let account = try await ctx.accounts.get(id: accountID) else {
-                throw ApplicationError.notFound
+                throw ApplicationError.notFound(accountID)
             }
             try account.assertPostable()
         }

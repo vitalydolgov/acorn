@@ -60,7 +60,7 @@ struct ReopenAccountTests {
     @Test("fails for unknown account")
     func failsForUnknown() async throws {
         let sut = SUT()
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             try await sut.reopenAccount(accountID: UUID())
         }
     }

@@ -23,7 +23,7 @@ public struct GetBalance: Sendable {
     @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws -> Balances {
         guard try await ctx.accounts.get(id: accountID) != nil else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(accountID)
         }
         let transactions = try await ctx.transactions.forAccount(accountID)
         let transfers = try await ctx.transfers.forAccount(accountID)

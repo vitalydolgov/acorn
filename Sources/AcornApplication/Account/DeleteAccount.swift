@@ -11,14 +11,15 @@ public struct DeleteAccount: Sendable {
     @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws {
         guard var account = try await ctx.accounts.get(id: accountID) else {
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(accountID)
         }
         let transactions = try await ctx.transactions.forAccount(accountID)
         let transfers = try await ctx.transfers.forAccount(accountID)
-        let hasLiveTransactions = transactions.contains { !$0.isDeleted }
-        let hasLiveTransfers = transfers.contains { !$0.isDeleted }
-        guard !hasLiveTransactions && !hasLiveTransfers else {
-            throw ApplicationError.invalidState
+        if transactions.contains(where: { !$0.isDeleted }) {
+            throw ApplicationError.invalidState("account has live transactions")
+        }
+        if transfers.contains(where: { !$0.isDeleted }) {
+            throw ApplicationError.invalidState("account is referenced by live transfers")
         }
         try account.delete()
         try await ctx.accounts.save(account)

@@ -23,7 +23,7 @@ public struct GetAccountID: Sendable {
             .filter { !$0.isDeleted && $0.name.lowercased() == needle }
         switch matches.count {
         case 0:
-            throw ApplicationError.notFound
+            throw ApplicationError.notFound(name: normalized)
         case 1:
             return .found(matches[0].id)
         default:

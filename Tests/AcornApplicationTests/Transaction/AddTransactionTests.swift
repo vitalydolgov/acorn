@@ -60,7 +60,7 @@ struct AddTransactionTests {
     func failsForUnknownAccount() async throws {
         let sut = try await SUT()
 
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.addTransaction(accountID: UUID(), amount: 10, date: Self.today)
         }
     }

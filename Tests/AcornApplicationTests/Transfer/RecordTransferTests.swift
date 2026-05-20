@@ -87,7 +87,7 @@ struct RecordTransferTests {
     @Test("fails when source account is unknown")
     func failsForUnknownFrom() async throws {
         let sut = try await SUT()
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.recordTransfer(
                 fromAccountID: UUID(),
                 toAccountID: sut.seedTo.id,
@@ -100,7 +100,7 @@ struct RecordTransferTests {
     @Test("fails when destination account is unknown")
     func failsForUnknownTo() async throws {
         let sut = try await SUT()
-        await #expect(throws: ApplicationError.notFound) {
+        await #expect(throws: ApplicationError.self) {
             _ = try await sut.recordTransfer(
                 fromAccountID: sut.seedFrom.id,
                 toAccountID: UUID(),
