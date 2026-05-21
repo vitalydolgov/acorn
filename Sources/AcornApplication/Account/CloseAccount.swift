@@ -13,11 +13,11 @@ public struct CloseAccount: Sendable {
     @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws {
         let today = todayProvider.today()
-        guard var account = try await ctx.accounts.get(id: accountID) else {
+        guard var account = try await ctx.accounts.fetch(id: accountID) else {
             throw ApplicationError.notFound(accountID)
         }
-        let transactions = try await ctx.transactions.forAccount(accountID)
-        let transfers = try await ctx.transfers.forAccount(accountID)
+        let transactions = try await ctx.transactions.fetchActive(forAccount: accountID)
+        let transfers = try await ctx.transfers.fetchActive(forAccount: accountID)
         let balance = BalanceCalculator.balance(
             transactions: transactions,
             transfers: transfers,

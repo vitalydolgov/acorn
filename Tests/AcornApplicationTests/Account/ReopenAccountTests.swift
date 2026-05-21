@@ -53,7 +53,7 @@ struct ReopenAccountTests {
 
         try await sut.reopenAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed == false)
     }
 
@@ -80,7 +80,7 @@ struct ReopenAccountTests {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
         try await sut.closeAccount(accountID: account.id)
-        let closed = try #require(try await sut.accounts.get(id: account.id))
+        let closed = try #require(try await sut.accounts.fetch(id: account.id))
         var deleted = closed
         try deleted.delete()
         try await sut.accounts.save(deleted)

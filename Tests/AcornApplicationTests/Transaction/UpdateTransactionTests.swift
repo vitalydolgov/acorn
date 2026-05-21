@@ -34,7 +34,7 @@ struct UpdateTransactionTests {
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
-            account = try await accounts.get(id: account.id)!
+            account = try await accounts.fetch(id: account.id)!
             self.seedAccount = account
         }
     }
@@ -49,7 +49,7 @@ struct UpdateTransactionTests {
 
         try await sut.updateTransaction(transactionID: tx.id, amount: 25, date: newDate)
 
-        let stored = try await sut.transactions.get(id: tx.id)
+        let stored = try await sut.transactions.fetch(id: tx.id)
         #expect(stored?.amount == 25)
         #expect(stored?.date == newDate)
     }
@@ -67,7 +67,7 @@ struct UpdateTransactionTests {
     func failsOnDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.addTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
-        var deletedTx = try await sut.transactions.get(id: tx.id)!
+        var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 

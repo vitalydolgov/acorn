@@ -10,7 +10,7 @@ public struct ReopenAccount: Sendable {
 
     @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws {
-        guard var account = try await ctx.accounts.get(id: accountID) else {
+        guard var account = try await ctx.accounts.fetch(id: accountID) else {
             throw ApplicationError.notFound(accountID)
         }
         try account.reopen()

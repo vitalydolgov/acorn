@@ -16,7 +16,7 @@ public struct RecordTransfer: Sendable {
         date: AcornDate
     ) async throws -> Transfer {
         for accountID in [fromAccountID, toAccountID] {
-            guard let account = try await ctx.accounts.get(id: accountID) else {
+            guard let account = try await ctx.accounts.fetch(id: accountID) else {
                 throw ApplicationError.notFound(accountID)
             }
             try account.assertPostable()

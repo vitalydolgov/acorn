@@ -60,9 +60,9 @@ struct CloseAccountTests {
 
         try await sut.closeAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed)
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
         #expect(txs.isEmpty)
     }
 
@@ -74,9 +74,9 @@ struct CloseAccountTests {
 
         try await sut.closeAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed)
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
         let adjustments = txs.filter { $0.kind == .adjustment }
         #expect(adjustments.count == 1)
         #expect(adjustments[0].amount == -100)
@@ -97,7 +97,7 @@ struct CloseAccountTests {
 
         try await sut.closeAccount(accountID: account.id)
 
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
         let adjustments = txs.filter { $0.kind == .adjustment }
         #expect(adjustments.count == 1)
         #expect(adjustments[0].amount == 40)
@@ -117,9 +117,9 @@ struct CloseAccountTests {
 
         try await sut.closeAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed)
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
         let adjustments = txs.filter { $0.kind == .adjustment }
         #expect(adjustments.count == 1)
         #expect(adjustments[0].amount == -30)
@@ -130,15 +130,15 @@ struct CloseAccountTests {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
         let tx = try await sut.addTransaction(accountID: account.id, amount: 50, date: sut.today)
-        var deleted = try await sut.transactions.get(id: tx.id)!
+        var deleted = try await sut.transactions.fetch(id: tx.id)!
         try deleted.delete()
         try await sut.transactions.save(deleted)
 
         try await sut.closeAccount(accountID: account.id)
 
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
         #expect(txs.contains { $0.kind == .adjustment } == false)
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed)
     }
 
@@ -172,9 +172,9 @@ struct CloseAccountTests {
             try await sut.closeAccount(accountID: account.id)
         }
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed == false)
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
         #expect(txs.contains { $0.kind == .adjustment } == false)
     }
 
@@ -182,7 +182,7 @@ struct CloseAccountTests {
     func failsOnDeleted() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        var deleted = try await sut.accounts.get(id: account.id)!
+        var deleted = try await sut.accounts.fetch(id: account.id)!
         try deleted.delete()
         try await sut.accounts.save(deleted)
 

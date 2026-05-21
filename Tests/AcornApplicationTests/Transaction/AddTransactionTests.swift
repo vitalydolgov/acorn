@@ -34,7 +34,7 @@ struct AddTransactionTests {
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
-            account = try await accounts.get(id: account.id)!
+            account = try await accounts.fetch(id: account.id)!
             self.seedAccount = account
         }
     }
@@ -48,7 +48,7 @@ struct AddTransactionTests {
         let inflow = try await sut.addTransaction(accountID: sut.seedAccount.id, amount: 50, date: Self.today)
         #expect(inflow.amount == 50)
         #expect(inflow.kind == .regular)
-        let storedIn = try await sut.transactions.get(id: inflow.id)
+        let storedIn = try await sut.transactions.fetch(id: inflow.id)
         #expect(storedIn?.amount == 50)
 
         let outflow = try await sut.addTransaction(accountID: sut.seedAccount.id, amount: -30, date: Self.today)

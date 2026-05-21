@@ -43,7 +43,7 @@ struct GetAccountTests {
         let sut = SUT()
         let account = try Account.make(name: "Checking", notes: "")
         try await sut.accounts.save(account)
-        var stored = try #require(try await sut.accounts.get(id: account.id))
+        var stored = try #require(try await sut.accounts.fetch(id: account.id))
         try stored.delete()
         try await sut.accounts.save(stored)
 

@@ -38,9 +38,9 @@ struct ReconcileTransferSideTests {
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")
             try await accounts.save(from)
-            from = try await accounts.get(id: from.id)!
+            from = try await accounts.fetch(id: from.id)!
             try await accounts.save(to)
-            to = try await accounts.get(id: to.id)!
+            to = try await accounts.fetch(id: to.id)!
             self.seedFrom = from
             self.seedTo = to
         }
@@ -63,7 +63,7 @@ struct ReconcileTransferSideTests {
 
         try await sut.reconcileSide(transferID: transfer.id, side: .to)
 
-        let stored = try #require(try await sut.transfers.get(id: transfer.id))
+        let stored = try #require(try await sut.transfers.fetch(id: transfer.id))
         #expect(stored.toStatus == .reconciled)
     }
 

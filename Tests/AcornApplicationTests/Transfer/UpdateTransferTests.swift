@@ -36,9 +36,9 @@ struct UpdateTransferTests {
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")
             try await accounts.save(from)
-            from = try await accounts.get(id: from.id)!
+            from = try await accounts.fetch(id: from.id)!
             try await accounts.save(to)
-            to = try await accounts.get(id: to.id)!
+            to = try await accounts.fetch(id: to.id)!
             self.seedFrom = from
             self.seedTo = to
         }
@@ -59,7 +59,7 @@ struct UpdateTransferTests {
 
         try await sut.updateTransfer(transferID: transfer.id, amount: 25, date: next)
 
-        let stored = try await sut.transfers.get(id: transfer.id)
+        let stored = try await sut.transfers.fetch(id: transfer.id)
         #expect(stored?.amount == 25)
         #expect(stored?.date == next)
     }

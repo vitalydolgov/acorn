@@ -61,7 +61,7 @@ struct DeleteAccountTests {
 
         try await sut.deleteAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isDeleted == true)
     }
 
@@ -85,7 +85,7 @@ struct DeleteAccountTests {
 
         try await sut.deleteAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isDeleted == true)
     }
 
@@ -112,7 +112,7 @@ struct DeleteAccountTests {
         let account = try await sut.openAccount(name: "A")
         let other = try await sut.openAccount(name: "B")
         let tx = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
-        var deletedTx = try await sut.transactions.get(id: tx.id)!
+        var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
         let transfer = try await sut.recordTransfer(
@@ -121,13 +121,13 @@ struct DeleteAccountTests {
             amount: 5,
             date: .today()
         )
-        var deletedTransfer = try await sut.transfers.get(id: transfer.id)!
+        var deletedTransfer = try await sut.transfers.fetch(id: transfer.id)!
         try deletedTransfer.delete()
         try await sut.transfers.save(deletedTransfer)
 
         try await sut.deleteAccount(accountID: account.id)
 
-        let stored = try #require(try await sut.accounts.get(id: account.id))
+        let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isDeleted == true)
     }
 

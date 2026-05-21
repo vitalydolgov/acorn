@@ -36,9 +36,9 @@ struct RecordTransferTests {
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")
             try await accounts.save(from)
-            from = try await accounts.get(id: from.id)!
+            from = try await accounts.fetch(id: from.id)!
             try await accounts.save(to)
-            to = try await accounts.get(id: to.id)!
+            to = try await accounts.fetch(id: to.id)!
             self.seedFrom = from
             self.seedTo = to
         }
@@ -57,13 +57,13 @@ struct RecordTransferTests {
             date: Self.today
         )
 
-        let stored = try #require(try await sut.transfers.get(id: transfer.id))
+        let stored = try #require(try await sut.transfers.fetch(id: transfer.id))
         #expect(stored.fromAccountID == sut.seedFrom.id)
         #expect(stored.toAccountID == sut.seedTo.id)
         #expect(stored.amount == 100)
 
-        let fromTransfers = try await sut.transfers.forAccount(sut.seedFrom.id)
-        let toTransfers = try await sut.transfers.forAccount(sut.seedTo.id)
+        let fromTransfers = try await sut.transfers.fetchActive(forAccount: sut.seedFrom.id)
+        let toTransfers = try await sut.transfers.fetchActive(forAccount: sut.seedTo.id)
         #expect(fromTransfers.count == 1)
         #expect(toTransfers.count == 1)
         #expect(fromTransfers[0].id == toTransfers[0].id)

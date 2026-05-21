@@ -10,9 +10,7 @@ public struct ListAccounts: Sendable {
 
     @UnitOfWork
     public func callAsFunction() async throws -> [Account] {
-        let all = try await ctx.accounts.all()
-        return all
-            .filter { !$0.isDeleted }
+        try await ctx.accounts.fetchActive()
             .sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
     }
 }

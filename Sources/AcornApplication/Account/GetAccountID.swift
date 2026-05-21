@@ -19,8 +19,8 @@ public struct GetAccountID: Sendable {
             throw ApplicationError.invalidArgument("name must not be blank")
         }
         let needle = normalized.lowercased()
-        let matches = try await ctx.accounts.all()
-            .filter { !$0.isDeleted && $0.name.lowercased() == needle }
+        let matches = try await ctx.accounts.fetchActive()
+            .filter { $0.name.lowercased() == needle }
         switch matches.count {
         case 0:
             throw ApplicationError.notFound(name: normalized)

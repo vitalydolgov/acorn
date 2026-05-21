@@ -10,7 +10,7 @@ public struct UpdateTransaction: Sendable {
 
     @UnitOfWork
     public func callAsFunction(transactionID: UUID, amount: Decimal, date: AcornDate) async throws {
-        guard var transaction = try await ctx.transactions.get(id: transactionID) else {
+        guard var transaction = try await ctx.transactions.fetch(id: transactionID) else {
             throw ApplicationError.notFound(transactionID)
         }
         try transaction.update(amount: amount, date: date)

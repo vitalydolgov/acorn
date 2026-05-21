@@ -42,7 +42,7 @@ struct OpenAccountTests {
         #expect(account.notes == "Primary")
         #expect(account.isClosed == false)
 
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "Checking")
         #expect(stored?.notes == "Primary")
     }
@@ -52,7 +52,7 @@ struct OpenAccountTests {
         let sut = SUT()
 
         let account = try await sut.openAccount(name: "Savings")
-        let txs = try await sut.transactions.forAccount(account.id)
+        let txs = try await sut.transactions.fetchActive(forAccount: account.id)
 
         #expect(txs.isEmpty)
     }
@@ -64,6 +64,6 @@ struct OpenAccountTests {
         await #expect(throws: DomainError.invalidArgument("name must not be blank")) {
             _ = try await sut.openAccount(name: "   ")
         }
-        #expect(try await sut.accounts.all().isEmpty)
+        #expect(try await sut.accounts.fetchActive().isEmpty)
     }
 }

@@ -10,7 +10,7 @@ public struct ClearTransferSide: Sendable {
 
     @UnitOfWork
     public func callAsFunction(transferID: UUID, side: TransferSide) async throws {
-        guard var transfer = try await ctx.transfers.get(id: transferID) else {
+        guard var transfer = try await ctx.transfers.fetch(id: transferID) else {
             throw ApplicationError.notFound(transferID)
         }
         try transfer.clear(side: side)

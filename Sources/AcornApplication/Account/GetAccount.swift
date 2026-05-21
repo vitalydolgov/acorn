@@ -10,7 +10,7 @@ public struct GetAccount: Sendable {
 
     @UnitOfWork
     public func callAsFunction(accountID: UUID) async throws -> Account {
-        guard let account = try await ctx.accounts.get(id: accountID),
+        guard let account = try await ctx.accounts.fetch(id: accountID),
               !account.isDeleted else {
             throw ApplicationError.notFound(accountID)
         }

@@ -148,7 +148,7 @@ struct AccountToolsTests {
         #expect(outcome.content.objectValue?["is_closed"]?.boolValue == false)
         let id = try #require(outcome.content.objectValue?["id"]?.stringValue)
         let uuid = try #require(UUID(uuidString: id))
-        let stored = try await uow.accounts.get(id: uuid)
+        let stored = try await uow.accounts.fetch(id: uuid)
         #expect(stored?.name == "Checking")
     }
 
@@ -184,7 +184,7 @@ struct AccountToolsTests {
 
         #expect(outcome.isError == false)
         #expect(outcome.content == .object(["ok": .bool(true)]))
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.isClosed == true)
     }
 
@@ -205,7 +205,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == false)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.isClosed == false)
     }
 
@@ -227,7 +227,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == false)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.name == "Everyday")
         #expect(stored?.notes == "new")
     }
@@ -249,7 +249,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == false)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.name == "Salary")
         #expect(stored?.notes == "rule: salary deposits only")
     }
@@ -271,7 +271,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == false)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.name == "New")
         #expect(stored?.notes == "keep me")
     }
@@ -280,7 +280,7 @@ struct AccountToolsTests {
     func updateAccountNothingProvided() async throws {
         let uow = makeUoW()
         let account = try await OpenAccount(unitOfWork: uow)(name: "Old", notes: "keep")
-        let before = try await uow.accounts.get(id: account.id)
+        let before = try await uow.accounts.fetch(id: account.id)
 
         let catalog = ToolCatalog()
         await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
@@ -291,7 +291,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == false)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.name == "Old")
         #expect(stored?.notes == "keep")
         #expect(stored?.version == before?.version)
@@ -311,7 +311,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == false)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.isDeleted == true)
     }
 
@@ -332,7 +332,7 @@ struct AccountToolsTests {
         )
 
         #expect(outcome.isError == true)
-        let stored = try await uow.accounts.get(id: account.id)
+        let stored = try await uow.accounts.fetch(id: account.id)
         #expect(stored?.isDeleted == false)
     }
 

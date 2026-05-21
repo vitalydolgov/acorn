@@ -39,7 +39,7 @@ struct UpdateAccountTests {
 
         try await sut.updateAccount(accountID: account.id, name: "New", notes: "new notes")
 
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "New")
         #expect(stored?.notes == "new notes")
     }
@@ -57,7 +57,7 @@ struct UpdateAccountTests {
     func failsOnDeleted() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "Old")
-        var deleted = try await sut.accounts.get(id: account.id)!
+        var deleted = try await sut.accounts.fetch(id: account.id)!
         try deleted.delete()
         try await sut.accounts.save(deleted)
 
@@ -74,7 +74,7 @@ struct UpdateAccountTests {
         await #expect(throws: DomainError.self) {
             try await sut.updateAccount(accountID: account.id, name: "   ", notes: "")
         }
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "Old")
     }
 
@@ -85,7 +85,7 @@ struct UpdateAccountTests {
 
         try await sut.updateAccount(accountID: account.id, notes: "new rule")
 
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "Salary")
         #expect(stored?.notes == "new rule")
     }
@@ -97,7 +97,7 @@ struct UpdateAccountTests {
 
         try await sut.updateAccount(accountID: account.id, name: "New")
 
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "New")
         #expect(stored?.notes == "keep me")
     }
@@ -109,7 +109,7 @@ struct UpdateAccountTests {
 
         try await sut.updateAccount(accountID: account.id, notes: "")
 
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "Acct")
         #expect(stored?.notes == "")
     }
@@ -118,11 +118,11 @@ struct UpdateAccountTests {
     func noOpWhenNothingProvided() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "Old", notes: "keep")
-        let before = try await sut.accounts.get(id: account.id)
+        let before = try await sut.accounts.fetch(id: account.id)
 
         try await sut.updateAccount(accountID: account.id)
 
-        let stored = try await sut.accounts.get(id: account.id)
+        let stored = try await sut.accounts.fetch(id: account.id)
         #expect(stored?.name == "Old")
         #expect(stored?.notes == "keep")
         #expect(stored?.version == before?.version)

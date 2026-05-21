@@ -34,7 +34,7 @@ struct ClearTransactionTests {
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
-            account = try await accounts.get(id: account.id)!
+            account = try await accounts.fetch(id: account.id)!
             self.seedAccount = account
         }
 
@@ -50,7 +50,7 @@ struct ClearTransactionTests {
 
         try await sut.clearTransaction(transactionID: tx.id)
 
-        let stored = try #require(try await sut.transactions.get(id: tx.id))
+        let stored = try #require(try await sut.transactions.fetch(id: tx.id))
         #expect(stored.status == .cleared)
     }
 
@@ -77,7 +77,7 @@ struct ClearTransactionTests {
     func failsOnDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        var deletedTx = try await sut.transactions.get(id: tx.id)!
+        var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 

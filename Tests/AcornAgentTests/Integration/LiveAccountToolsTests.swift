@@ -90,7 +90,7 @@ struct LiveAccountToolsTests {
         #expect(names.contains("update_account"))
         #expect(!names.contains("get_account"))
 
-        let stored = try await uow.accounts.get(id: checking.id)
+        let stored = try await uow.accounts.fetch(id: checking.id)
         #expect(stored?.name == "Everyday")
         #expect(stored?.notes == "primary spending")
     }
