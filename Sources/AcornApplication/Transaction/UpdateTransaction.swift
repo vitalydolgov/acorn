@@ -13,6 +13,9 @@ public struct UpdateTransaction: Sendable {
         guard var transaction = try await ctx.transactions.fetch(id: transactionID) else {
             throw ApplicationError.notFound(transactionID)
         }
+        guard !transaction.isTransferLeg else {
+            throw ApplicationError.invalidArgument("cannot edit a transfer leg directly; use UpdateTransfer")
+        }
         try transaction.update(amount: amount, date: date)
         try await ctx.transactions.save(transaction)
     }

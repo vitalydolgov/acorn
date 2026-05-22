@@ -13,8 +13,7 @@ struct ListAccountsTests {
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.accounts = accounts
             self.listAccounts = ListAccounts(unitOfWork: uow)
         }

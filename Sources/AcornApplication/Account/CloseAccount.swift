@@ -17,10 +17,8 @@ public struct CloseAccount: Sendable {
             throw ApplicationError.notFound(accountID)
         }
         let transactions = try await ctx.transactions.fetchActive(forAccount: accountID)
-        let transfers = try await ctx.transfers.fetchActive(forAccount: accountID)
         let balance = BalanceCalculator.balance(
             transactions: transactions,
-            transfers: transfers,
             accountID: accountID
         )
         if balance != 0 {

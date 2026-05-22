@@ -15,7 +15,6 @@ struct CloseAccountTests {
         // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
-        let transfers: InMemoryTransferRepository
 
         // Services
         let openAccount: OpenAccount
@@ -26,19 +25,16 @@ struct CloseAccountTests {
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
 
             self.uow = InMemoryUnitOfWork(
                 accounts: accounts,
-                transactions: transactions,
-                transfers: transfers
+                transactions: transactions
             )
             self.todayProvider = FixedTodayProvider(date: .today())
 
             // Repos
             self.accounts = accounts
             self.transactions = transactions
-            self.transfers = transfers
 
             // Services
             self.openAccount = OpenAccount(unitOfWork: uow)
@@ -83,7 +79,6 @@ struct CloseAccountTests {
         #expect(adjustments[0].date == sut.today)
         let balance = BalanceCalculator.balance(
             transactions: txs,
-            transfers: [Transfer](),
             accountID: account.id
         )
         #expect(balance == 0)

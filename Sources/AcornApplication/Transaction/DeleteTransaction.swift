@@ -13,6 +13,9 @@ public struct DeleteTransaction: Sendable {
         guard var transaction = try await ctx.transactions.fetch(id: transactionID) else {
             throw ApplicationError.notFound(transactionID)
         }
+        guard !transaction.isTransferLeg else {
+            throw ApplicationError.invalidArgument("cannot delete a transfer leg directly; use DeleteTransfer")
+        }
         try transaction.delete()
         try await ctx.transactions.save(transaction)
     }

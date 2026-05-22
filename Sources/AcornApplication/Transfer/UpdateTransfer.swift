@@ -10,10 +10,13 @@ public struct UpdateTransfer: Sendable {
 
     @UnitOfWork
     public func callAsFunction(transferID: UUID, amount: Decimal, date: AcornDate) async throws {
-        guard var transfer = try await ctx.transfers.fetch(id: transferID) else {
+        let legs = try await ctx.transactions.fetch(transferID: transferID)
+        guard !legs.isEmpty else {
             throw ApplicationError.notFound(transferID)
         }
-        try transfer.update(amount: amount, date: date)
-        try await ctx.transfers.save(transfer)
+        for var leg in legs {
+            try leg.reviseTransferLeg(amount: amount, date: date)
+            try await ctx.transactions.save(leg)
+        }
     }
 }

@@ -21,8 +21,7 @@ struct AdjustAccountTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
 
             // Repos

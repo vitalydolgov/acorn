@@ -10,7 +10,7 @@ struct DeleteTransferTests {
         let uow: InMemoryUnitOfWork
 
         // Repos
-        let transfers: InMemoryTransferRepository
+        let transactions: InMemoryTransactionRepository
 
         // Services
         let recordTransfer: RecordTransfer
@@ -22,12 +22,11 @@ struct DeleteTransferTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
 
             // Repos
-            self.transfers = transfers
+            self.transactions = transactions
 
             // Services
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
@@ -43,7 +42,7 @@ struct DeleteTransferTests {
             self.seedTo = to
         }
 
-        func make() async throws -> Transfer {
+        func make() async throws -> (from: Transaction, to: Transaction) {
             try await recordTransfer(
                 fromAccountID: seedFrom.id,
                 toAccountID: seedTo.id,
@@ -53,25 +52,29 @@ struct DeleteTransferTests {
         }
     }
 
-    @Test("marks the transfer deleted")
+    @Test("marks both legs deleted")
     func marksDeleted() async throws {
         let sut = try await SUT()
-        let transfer = try await sut.make()
+        let legs = try await sut.make()
+        let transferID = try #require(legs.from.transferID)
 
-        try await sut.deleteTransfer(transferID: transfer.id)
+        try await sut.deleteTransfer(transferID: transferID)
 
-        let stored = try #require(try await sut.transfers.fetch(id: transfer.id))
-        #expect(stored.isDeleted)
+        let from = try #require(try await sut.transactions.fetch(id: legs.from.id))
+        let to = try #require(try await sut.transactions.fetch(id: legs.to.id))
+        #expect(from.isDeleted)
+        #expect(to.isDeleted)
     }
 
     @Test("fails when already deleted")
     func failsWhenAlreadyDeleted() async throws {
         let sut = try await SUT()
-        let transfer = try await sut.make()
-        try await sut.deleteTransfer(transferID: transfer.id)
+        let legs = try await sut.make()
+        let transferID = try #require(legs.from.transferID)
+        try await sut.deleteTransfer(transferID: transferID)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.deleteTransfer(transferID: transfer.id)
+            try await sut.deleteTransfer(transferID: transferID)
         }
     }
 

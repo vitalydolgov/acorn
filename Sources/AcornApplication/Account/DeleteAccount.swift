@@ -14,11 +14,9 @@ public struct DeleteAccount: Sendable {
             throw ApplicationError.notFound(accountID)
         }
         let transactions = try await ctx.transactions.fetchActive(forAccount: accountID)
-        let transfers = try await ctx.transfers.fetchActive(forAccount: accountID)
         guard AccountPolicy.canDelete(
             accountID: accountID,
-            transactions: transactions,
-            transfers: transfers
+            transactions: transactions
         ) else {
             throw ApplicationError.policyViolation("account cannot be deleted")
         }

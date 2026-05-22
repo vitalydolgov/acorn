@@ -29,10 +29,14 @@ struct BalanceCalculatorTests {
         return tx
     }
 
-    private func clearedSide(_ transfer: Transfer, _ side: TransferSide) throws -> Transfer {
-        var transfer = transfer
-        try transfer.clear(side: side)
-        return transfer
+    /// Outflow leg on `accountID`.
+    private func outgoing(_ amount: Decimal) throws -> Transaction {
+        try Transaction.transfer(fromAccountID: accountID, toAccountID: other, amount: amount, date: today).from
+    }
+
+    /// Inflow leg on `accountID`.
+    private func incoming(_ amount: Decimal) throws -> Transaction {
+        try Transaction.transfer(fromAccountID: other, toAccountID: accountID, amount: amount, date: today).to
     }
 
     // MARK: - balance
@@ -46,11 +50,7 @@ struct BalanceCalculatorTests {
             withdraw(30),
         ]
         #expect(
-            BalanceCalculator.balance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 145
+            BalanceCalculator.balance(transactions: txs, accountID: accountID) == 145
         )
     }
 
@@ -63,22 +63,14 @@ struct BalanceCalculatorTests {
             deletedDeposit,
         ]
         #expect(
-            BalanceCalculator.balance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 100
+            BalanceCalculator.balance(transactions: txs, accountID: accountID) == 100
         )
     }
 
     @Test("balance of empty sequence is zero")
     func balanceOfEmptyIsZero() {
         #expect(
-            BalanceCalculator.balance(
-                transactions: [Transaction](),
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 0
+            BalanceCalculator.balance(transactions: [Transaction](), accountID: accountID) == 0
         )
     }
 
@@ -87,65 +79,35 @@ struct BalanceCalculatorTests {
         let foreign = Transaction.add(accountID: other, amount: 500, date: today)
         let txs = [deposit(100), foreign]
         #expect(
-            BalanceCalculator.balance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 100
+            BalanceCalculator.balance(transactions: txs, accountID: accountID) == 100
         )
     }
 
-    @Test("balance subtracts outgoing transfers and adds incoming")
+    @Test("balance subtracts outgoing transfer legs and adds incoming")
     func balanceAppliesTransferLegs() throws {
-        let outgoing = try Transfer.create(
-            fromAccountID: accountID,
-            toAccountID: other,
-            amount: 30,
-            date: today
-        )
-        let incoming = try Transfer.create(
-            fromAccountID: other,
-            toAccountID: accountID,
-            amount: 10,
-            date: today
-        )
+        let txs = [deposit(100), try outgoing(30), try incoming(10)]
         #expect(
-            BalanceCalculator.balance(
-                transactions: [deposit(100)],
-                transfers: [outgoing, incoming],
-                accountID: accountID
-            ) == 80
+            BalanceCalculator.balance(transactions: txs, accountID: accountID) == 80
         )
     }
 
-    @Test("balance skips deleted transfers")
+    @Test("balance skips deleted transfer legs")
     func balanceSkipsDeletedTransfers() throws {
-        var deletedTransfer = try Transfer.create(
-            fromAccountID: accountID,
-            toAccountID: other,
-            amount: 30,
-            date: today
-        )
-        try deletedTransfer.delete()
+        var deletedLeg = try outgoing(30)
+        try deletedLeg.delete()
+        let txs = [deposit(100), deletedLeg]
         #expect(
-            BalanceCalculator.balance(
-                transactions: [deposit(100)],
-                transfers: [deletedTransfer],
-                accountID: accountID
-            ) == 100
+            BalanceCalculator.balance(transactions: txs, accountID: accountID) == 100
         )
     }
 
-    @Test("balance ignores transfers that do not involve the account")
+    @Test("balance ignores transfer legs that do not involve the account")
     func balanceIgnoresUnrelatedTransfers() throws {
         let a = UUID(), b = UUID()
-        let unrelated = try Transfer.create(fromAccountID: a, toAccountID: b, amount: 50, date: today)
+        let unrelated = try Transaction.transfer(fromAccountID: a, toAccountID: b, amount: 50, date: today)
+        let txs = [deposit(100), unrelated.from, unrelated.to]
         #expect(
-            BalanceCalculator.balance(
-                transactions: [deposit(100)],
-                transfers: [unrelated],
-                accountID: accountID
-            ) == 100
+            BalanceCalculator.balance(transactions: txs, accountID: accountID) == 100
         )
     }
 
@@ -159,11 +121,7 @@ struct BalanceCalculatorTests {
             try reconciled(deposit(25)),
         ]
         #expect(
-            BalanceCalculator.clearedBalance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 75
+            BalanceCalculator.clearedBalance(transactions: txs, accountID: accountID) == 75
         )
     }
 
@@ -176,32 +134,17 @@ struct BalanceCalculatorTests {
             deletedClearedDeposit,
         ]
         #expect(
-            BalanceCalculator.clearedBalance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 50
+            BalanceCalculator.clearedBalance(transactions: txs, accountID: accountID) == 50
         )
     }
 
-    @Test("clearedBalance counts only transfer sides that are cleared")
-    func clearedBalanceAppliesClearedTransferSides() throws {
-        let clearedOut = try clearedSide(
-            try Transfer.create(fromAccountID: accountID, toAccountID: other, amount: 30, date: today),
-            .from
-        )
-        let unclearedIn = try Transfer.create(
-            fromAccountID: other,
-            toAccountID: accountID,
-            amount: 10,
-            date: today
-        )
+    @Test("clearedBalance counts only transfer legs that are cleared")
+    func clearedBalanceAppliesClearedTransferLegs() throws {
+        let clearedOut = try cleared(try outgoing(30))
+        let unclearedIn = try incoming(10)
+        let txs = [try cleared(deposit(100)), clearedOut, unclearedIn]
         #expect(
-            BalanceCalculator.clearedBalance(
-                transactions: [try cleared(deposit(100))],
-                transfers: [clearedOut, unclearedIn],
-                accountID: accountID
-            ) == 70
+            BalanceCalculator.clearedBalance(transactions: txs, accountID: accountID) == 70
         )
     }
 
@@ -216,11 +159,7 @@ struct BalanceCalculatorTests {
             withdraw(40),
         ]
         #expect(
-            BalanceCalculator.unclearedBalance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 60
+            BalanceCalculator.unclearedBalance(transactions: txs, accountID: accountID) == 60
         )
     }
 
@@ -233,38 +172,23 @@ struct BalanceCalculatorTests {
             deletedDeposit,
         ]
         #expect(
-            BalanceCalculator.unclearedBalance(
-                transactions: txs,
-                transfers: [Transfer](),
-                accountID: accountID
-            ) == 100
+            BalanceCalculator.unclearedBalance(transactions: txs, accountID: accountID) == 100
         )
     }
 
-    @Test("unclearedBalance counts only transfer sides that are uncleared")
-    func unclearedBalanceAppliesUnclearedTransferSides() throws {
-        let clearedOut = try clearedSide(
-            try Transfer.create(fromAccountID: accountID, toAccountID: other, amount: 30, date: today),
-            .from
-        )
-        let unclearedIn = try Transfer.create(
-            fromAccountID: other,
-            toAccountID: accountID,
-            amount: 10,
-            date: today
-        )
+    @Test("unclearedBalance counts only transfer legs that are uncleared")
+    func unclearedBalanceAppliesUnclearedTransferLegs() throws {
+        let clearedOut = try cleared(try outgoing(30))
+        let unclearedIn = try incoming(10)
+        let txs = [deposit(100), clearedOut, unclearedIn]
         #expect(
-            BalanceCalculator.unclearedBalance(
-                transactions: [deposit(100)],
-                transfers: [clearedOut, unclearedIn],
-                accountID: accountID
-            ) == 110
+            BalanceCalculator.unclearedBalance(transactions: txs, accountID: accountID) == 110
         )
     }
 
     // MARK: - invariant
 
-    @Test("cleared + uncleared equals total balance, including transfers")
+    @Test("cleared + uncleared equals total balance, including transfer legs")
     func clearedPlusUnclearedEqualsBalance() throws {
         var deletedDeposit = deposit(999)
         try deletedDeposit.delete()
@@ -274,29 +198,12 @@ struct BalanceCalculatorTests {
             try reconciled(deposit(25)),
             withdraw(30),
             deletedDeposit,
+            try cleared(try outgoing(30)),
+            try incoming(10),
         ]
-        let transfers = [
-            try clearedSide(
-                try Transfer.create(fromAccountID: accountID, toAccountID: other, amount: 30, date: today),
-                .from
-            ),
-            try Transfer.create(fromAccountID: other, toAccountID: accountID, amount: 10, date: today),
-        ]
-        let total = BalanceCalculator.balance(
-            transactions: txs,
-            transfers: transfers,
-            accountID: accountID
-        )
-        let cleared = BalanceCalculator.clearedBalance(
-            transactions: txs,
-            transfers: transfers,
-            accountID: accountID
-        )
-        let uncleared = BalanceCalculator.unclearedBalance(
-            transactions: txs,
-            transfers: transfers,
-            accountID: accountID
-        )
+        let total = BalanceCalculator.balance(transactions: txs, accountID: accountID)
+        let cleared = BalanceCalculator.clearedBalance(transactions: txs, accountID: accountID)
+        let uncleared = BalanceCalculator.unclearedBalance(transactions: txs, accountID: accountID)
         #expect(cleared + uncleared == total)
     }
 }

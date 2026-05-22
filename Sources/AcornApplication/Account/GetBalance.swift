@@ -26,21 +26,17 @@ public struct GetBalance: Sendable {
             throw ApplicationError.notFound(accountID)
         }
         let transactions = try await ctx.transactions.fetchActive(forAccount: accountID)
-        let transfers = try await ctx.transfers.fetchActive(forAccount: accountID)
         return Balances(
             cleared: BalanceCalculator.clearedBalance(
                 transactions: transactions,
-                transfers: transfers,
                 accountID: accountID
             ),
             uncleared: BalanceCalculator.unclearedBalance(
                 transactions: transactions,
-                transfers: transfers,
                 accountID: accountID
             ),
             working: BalanceCalculator.balance(
                 transactions: transactions,
-                transfers: transfers,
                 accountID: accountID
             )
         )

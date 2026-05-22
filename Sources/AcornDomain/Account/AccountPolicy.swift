@@ -3,17 +3,14 @@ import Foundation
 public enum AccountPolicy {
     public static func canDelete(
         accountID: UUID,
-        transactions: some Sequence<Transaction>,
-        transfers: some Sequence<Transfer>
+        transactions: some Sequence<Transaction>
     ) -> Bool {
-        let hasLiveTransfer = transfers.contains { transfer in
-            !transfer.isDeleted
-                && (transfer.fromAccountID == accountID || transfer.toAccountID == accountID)
+        let hasLiveTransferLeg = transactions.contains { tx in
+            !tx.isDeleted && tx.accountID == accountID && tx.isTransferLeg
         }
-        if hasLiveTransfer { return false }
+        if hasLiveTransferLeg { return false }
         let balance = BalanceCalculator.balance(
             transactions: transactions,
-            transfers: transfers,
             accountID: accountID
         )
         return balance == 0

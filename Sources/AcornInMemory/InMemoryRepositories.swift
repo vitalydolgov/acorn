@@ -47,6 +47,10 @@ public final class InMemoryTransactionRepository: TransactionRepository {
         transactions.values.filter { $0.accountID == accountID && !$0.isDeleted }
     }
 
+    public func fetch(transferID: UUID) async throws -> [Transaction] {
+        transactions.values.filter { $0.transferID == transferID }
+    }
+
     public func save(_ transaction: Transaction) async throws {
         try saveHook?(transaction)
         try transactions.upsert(transaction)
@@ -55,28 +59,4 @@ public final class InMemoryTransactionRepository: TransactionRepository {
     public func delete(id: UUID) async throws { transactions.removeValue(forKey: id) }
 
     public func put(_ transaction: Transaction) { transactions[transaction.id] = transaction }
-}
-
-public final class InMemoryTransferRepository: TransferRepository {
-    public var transfers: [UUID: Transfer] = [:]
-    public var saveHook: ((Transfer) throws -> Void)?
-
-    public init() {}
-
-    public func fetch(id: UUID) async throws -> Transfer? { transfers[id] }
-
-    public func fetchActive(forAccount accountID: UUID) async throws -> [Transfer] {
-        transfers.values.filter {
-            ($0.fromAccountID == accountID || $0.toAccountID == accountID) && !$0.isDeleted
-        }
-    }
-
-    public func save(_ transfer: Transfer) async throws {
-        try saveHook?(transfer)
-        try transfers.upsert(transfer)
-    }
-
-    public func delete(id: UUID) async throws { transfers.removeValue(forKey: id) }
-
-    public func put(_ transfer: Transfer) { transfers[transfer.id] = transfer }
 }

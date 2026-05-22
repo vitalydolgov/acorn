@@ -21,8 +21,7 @@ struct UpdateTransactionTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
 
             // Repos
@@ -73,6 +72,22 @@ struct UpdateTransactionTests {
 
         await #expect(throws: DomainError.deleted) {
             try await sut.updateTransaction(transactionID: tx.id, amount: 99, date: Self.today)
+        }
+    }
+
+    @Test("rejects editing a transfer leg directly")
+    func rejectsTransferLeg() async throws {
+        let sut = try await SUT()
+        let legs = try Transaction.transfer(
+            fromAccountID: sut.seedAccount.id,
+            toAccountID: UUID(),
+            amount: 10,
+            date: Self.today
+        )
+        try await sut.transactions.save(legs.from)
+
+        await #expect(throws: ApplicationError.self) {
+            try await sut.updateTransaction(transactionID: legs.from.id, amount: 5, date: Self.today)
         }
     }
 }

@@ -14,20 +14,21 @@ public struct RecordTransfer: Sendable {
         toAccountID: UUID,
         amount: Decimal,
         date: AcornDate
-    ) async throws -> Transfer {
+    ) async throws -> (from: Transaction, to: Transaction) {
         for accountID in [fromAccountID, toAccountID] {
             guard let account = try await ctx.accounts.fetch(id: accountID) else {
                 throw ApplicationError.notFound(accountID)
             }
             try account.assertPostable()
         }
-        let transfer = try Transfer.create(
+        let legs = try Transaction.transfer(
             fromAccountID: fromAccountID,
             toAccountID: toAccountID,
             amount: amount,
             date: date
         )
-        try await ctx.transfers.save(transfer)
-        return transfer
+        try await ctx.transactions.save(legs.from)
+        try await ctx.transactions.save(legs.to)
+        return legs
     }
 }

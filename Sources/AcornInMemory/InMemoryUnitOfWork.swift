@@ -5,16 +5,13 @@ import AcornApplication
 public final class InMemoryUnitOfWork: UnitOfWork, @unchecked Sendable {
     public let accounts: InMemoryAccountRepository
     public let transactions: InMemoryTransactionRepository
-    public let transfers: InMemoryTransferRepository
 
     public init(
         accounts: InMemoryAccountRepository = InMemoryAccountRepository(),
-        transactions: InMemoryTransactionRepository = InMemoryTransactionRepository(),
-        transfers: InMemoryTransferRepository = InMemoryTransferRepository()
+        transactions: InMemoryTransactionRepository = InMemoryTransactionRepository()
     ) {
         self.accounts = accounts
         self.transactions = transactions
-        self.transfers = transfers
     }
 
     public func perform<T: Sendable>(
@@ -22,14 +19,12 @@ public final class InMemoryUnitOfWork: UnitOfWork, @unchecked Sendable {
     ) async throws -> T {
         let accountsSnap = accounts.accounts
         let transactionsSnap = transactions.transactions
-        let transfersSnap = transfers.transfers
-        let ctx = Context(accounts: accounts, transactions: transactions, transfers: transfers)
+        let ctx = Context(accounts: accounts, transactions: transactions)
         do {
             return try await body(ctx)
         } catch {
             accounts.accounts = accountsSnap
             transactions.transactions = transactionsSnap
-            transfers.transfers = transfersSnap
             throw error
         }
     }
@@ -37,6 +32,5 @@ public final class InMemoryUnitOfWork: UnitOfWork, @unchecked Sendable {
     private struct Context: RepositoryContext {
         let accounts: any AccountRepository
         let transactions: any TransactionRepository
-        let transfers: any TransferRepository
     }
 }

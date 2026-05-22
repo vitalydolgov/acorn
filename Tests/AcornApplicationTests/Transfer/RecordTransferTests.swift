@@ -11,7 +11,7 @@ struct RecordTransferTests {
 
         // Repos
         let accounts: InMemoryAccountRepository
-        let transfers: InMemoryTransferRepository
+        let transactions: InMemoryTransactionRepository
 
         // Services
         let recordTransfer: RecordTransfer
@@ -22,13 +22,12 @@ struct RecordTransferTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
 
             // Repos
             self.accounts = accounts
-            self.transfers = transfers
+            self.transactions = transactions
 
             // Services
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
@@ -46,41 +45,45 @@ struct RecordTransferTests {
 
     private static let today = AcornDate.today()
 
-    @Test("stores a single Transfer and balances the two accounts")
-    func storesOneTransfer() async throws {
+    @Test("stores two mirrored legs that balance the two accounts")
+    func storesTwoLegs() async throws {
         let sut = try await SUT()
 
-        let transfer = try await sut.recordTransfer(
+        let legs = try await sut.recordTransfer(
             fromAccountID: sut.seedFrom.id,
             toAccountID: sut.seedTo.id,
             amount: 100,
             date: Self.today
         )
 
-        let stored = try #require(try await sut.transfers.fetch(id: transfer.id))
-        #expect(stored.fromAccountID == sut.seedFrom.id)
-        #expect(stored.toAccountID == sut.seedTo.id)
-        #expect(stored.amount == 100)
+        // Outflow leg on the source account.
+        #expect(legs.from.accountID == sut.seedFrom.id)
+        #expect(legs.from.amount == -100)
+        #expect(legs.from.counterpartAccountID == sut.seedTo.id)
+        #expect(legs.from.status == .uncleared)
+        #expect(legs.from.isTransferLeg)
 
-        let fromTransfers = try await sut.transfers.fetchActive(forAccount: sut.seedFrom.id)
-        let toTransfers = try await sut.transfers.fetchActive(forAccount: sut.seedTo.id)
-        #expect(fromTransfers.count == 1)
-        #expect(toTransfers.count == 1)
-        #expect(fromTransfers[0].id == toTransfers[0].id)
+        // Inflow leg on the destination account.
+        #expect(legs.to.accountID == sut.seedTo.id)
+        #expect(legs.to.amount == 100)
+        #expect(legs.to.counterpartAccountID == sut.seedFrom.id)
+        #expect(legs.to.status == .uncleared)
+        #expect(legs.to.isTransferLeg)
+
+        // Both legs share one transfer id.
+        #expect(legs.from.transferID == legs.to.transferID)
+
+        // Each account's register fetches the leg as a plain transaction.
+        let fromTxs = try await sut.transactions.fetchActive(forAccount: sut.seedFrom.id)
+        let toTxs = try await sut.transactions.fetchActive(forAccount: sut.seedTo.id)
+        #expect(fromTxs.count == 1)
+        #expect(toTxs.count == 1)
 
         #expect(
-            BalanceCalculator.balance(
-                transactions: [Transaction](),
-                transfers: fromTransfers,
-                accountID: sut.seedFrom.id
-            ) == -100
+            BalanceCalculator.balance(transactions: fromTxs, accountID: sut.seedFrom.id) == -100
         )
         #expect(
-            BalanceCalculator.balance(
-                transactions: [Transaction](),
-                transfers: toTransfers,
-                accountID: sut.seedTo.id
-            ) == 100
+            BalanceCalculator.balance(transactions: toTxs, accountID: sut.seedTo.id) == 100
         )
     }
 

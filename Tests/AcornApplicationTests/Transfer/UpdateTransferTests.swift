@@ -10,7 +10,7 @@ struct UpdateTransferTests {
         let uow: InMemoryUnitOfWork
 
         // Repos
-        let transfers: InMemoryTransferRepository
+        let transactions: InMemoryTransactionRepository
 
         // Services
         let recordTransfer: RecordTransfer
@@ -22,12 +22,11 @@ struct UpdateTransferTests {
         init() async throws {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
 
             // Repos
-            self.transfers = transfers
+            self.transactions = transactions
 
             // Services
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
@@ -46,22 +45,42 @@ struct UpdateTransferTests {
 
     private static let today = AcornDate.today()
 
-    @Test("changes amount and date")
-    func changesAmountAndDate() async throws {
+    @Test("revises both legs, preserving their direction")
+    func changesBothLegs() async throws {
         let sut = try await SUT()
-        let transfer = try await sut.recordTransfer(
+        let legs = try await sut.recordTransfer(
             fromAccountID: sut.seedFrom.id,
             toAccountID: sut.seedTo.id,
             amount: 10,
             date: Self.today
         )
+        let transferID = try #require(legs.from.transferID)
         let next = Self.today.adding(days: 3)
 
-        try await sut.updateTransfer(transferID: transfer.id, amount: 25, date: next)
+        try await sut.updateTransfer(transferID: transferID, amount: 25, date: next)
 
-        let stored = try await sut.transfers.fetch(id: transfer.id)
-        #expect(stored?.amount == 25)
-        #expect(stored?.date == next)
+        let from = try #require(try await sut.transactions.fetch(id: legs.from.id))
+        let to = try #require(try await sut.transactions.fetch(id: legs.to.id))
+        #expect(from.amount == -25)
+        #expect(from.date == next)
+        #expect(to.amount == 25)
+        #expect(to.date == next)
+    }
+
+    @Test("fails for non-positive amount")
+    func failsForNonPositive() async throws {
+        let sut = try await SUT()
+        let legs = try await sut.recordTransfer(
+            fromAccountID: sut.seedFrom.id,
+            toAccountID: sut.seedTo.id,
+            amount: 10,
+            date: Self.today
+        )
+        let transferID = try #require(legs.from.transferID)
+
+        await #expect(throws: DomainError.invalidArgument("amount must be positive")) {
+            try await sut.updateTransfer(transferID: transferID, amount: 0, date: Self.today)
+        }
     }
 
     @Test("fails for unknown transfer")

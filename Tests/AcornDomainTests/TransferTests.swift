@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import AcornDomain
 
-@Suite("Transfer")
+@Suite("Transfer legs")
 struct TransferTests {
     private let from = UUID()
     private let to = UUID()
@@ -10,29 +10,48 @@ struct TransferTests {
 
     // MARK: - Create
 
-    @Test("create stores positive magnitude and from/to identities")
-    func createStoresFields() throws {
-        let transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 75, date: today)
-        #expect(transfer.fromAccountID == from)
-        #expect(transfer.toAccountID == to)
-        #expect(transfer.amount == 75)
-        #expect(transfer.date == today)
-        #expect(transfer.fromStatus == .uncleared)
-        #expect(transfer.toStatus == .uncleared)
-        #expect(transfer.isDeleted == false)
+    @Test("builds two mirrored legs linked by a shared transfer id")
+    func createBuildsMirroredLegs() throws {
+        let legs = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: 75, date: today)
+
+        #expect(legs.from.accountID == from)
+        #expect(legs.from.amount == -75)
+        #expect(legs.from.counterpartAccountID == to)
+        #expect(legs.from.status == .uncleared)
+        #expect(legs.from.isTransferLeg)
+        #expect(legs.from.isDeleted == false)
+
+        #expect(legs.to.accountID == to)
+        #expect(legs.to.amount == 75)
+        #expect(legs.to.counterpartAccountID == from)
+        #expect(legs.to.status == .uncleared)
+        #expect(legs.to.isTransferLeg)
+
+        #expect(legs.from.date == today)
+        #expect(legs.to.date == today)
+        #expect(legs.from.transferID == legs.to.transferID)
+        #expect(legs.from.id != legs.to.id)
+    }
+
+    @Test("non-transfer transactions expose no transfer linkage")
+    func regularTransactionHasNoLinkage() {
+        let tx = Transaction.add(accountID: from, amount: 10, date: today)
+        #expect(tx.isTransferLeg == false)
+        #expect(tx.transferID == nil)
+        #expect(tx.counterpartAccountID == nil)
     }
 
     @Test("create rejects zero amount")
     func createRejectsZero() {
         #expect(throws: DomainError.invalidArgument("amount must be positive")) {
-            _ = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 0, date: today)
+            _ = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: 0, date: today)
         }
     }
 
     @Test("create rejects negative amount")
     func createRejectsNegative() {
         #expect(throws: DomainError.invalidArgument("amount must be positive")) {
-            _ = try Transfer.create(fromAccountID: from, toAccountID: to, amount: -1, date: today)
+            _ = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: -1, date: today)
         }
     }
 
@@ -40,125 +59,61 @@ struct TransferTests {
     func createRejectsSameAccount() {
         let same = UUID()
         #expect(throws: DomainError.invalidArgument("source and destination must differ")) {
-            _ = try Transfer.create(fromAccountID: same, toAccountID: same, amount: 10, date: today)
+            _ = try Transaction.transfer(fromAccountID: same, toAccountID: same, amount: 10, date: today)
         }
     }
 
-    // MARK: - Update
+    // MARK: - Revise
 
-    @Test("update changes amount and date")
-    func updateChangesAmountAndDate() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
+    @Test("revise keeps each leg's direction and changes the date")
+    func reviseKeepsDirection() throws {
+        var legs = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: 10, date: today)
         let next = today.adding(days: 1)
-        try transfer.update(amount: 99, date: next)
-        #expect(transfer.amount == 99)
-        #expect(transfer.date == next)
+
+        try legs.from.reviseTransferLeg(amount: 99, date: next)
+        try legs.to.reviseTransferLeg(amount: 99, date: next)
+
+        #expect(legs.from.amount == -99)
+        #expect(legs.to.amount == 99)
+        #expect(legs.from.date == next)
+        #expect(legs.to.date == next)
     }
 
-    @Test("update rejects non-positive amount")
-    func updateRejectsNonPositive() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
+    @Test("revise rejects non-positive amount")
+    func reviseRejectsNonPositive() throws {
+        var legs = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: 10, date: today)
         #expect(throws: DomainError.invalidArgument("amount must be positive")) {
-            try transfer.update(amount: 0, date: today)
+            try legs.from.reviseTransferLeg(amount: 0, date: today)
         }
         #expect(throws: DomainError.invalidArgument("amount must be positive")) {
-            try transfer.update(amount: -5, date: today)
+            try legs.to.reviseTransferLeg(amount: -5, date: today)
         }
     }
 
-    @Test("update fails on deleted transfer")
-    func updateFailsOnDeleted() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.delete()
+    @Test("revise fails on a deleted leg")
+    func reviseFailsOnDeleted() throws {
+        var legs = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: 10, date: today)
+        try legs.from.delete()
         #expect(throws: DomainError.deleted) {
-            try transfer.update(amount: 20, date: today)
+            try legs.from.reviseTransferLeg(amount: 20, date: today)
         }
     }
 
-    // MARK: - Status (per side)
+    // MARK: - Per-leg status
 
-    @Test("clear flips a side uncleared to cleared independently")
-    func clearOneSide() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.clear(side: .from)
-        #expect(transfer.fromStatus == .cleared)
-        #expect(transfer.toStatus == .uncleared)
-    }
+    @Test("legs clear, unclear, and reconcile independently")
+    func legsStatusIndependent() throws {
+        var legs = try Transaction.transfer(fromAccountID: from, toAccountID: to, amount: 10, date: today)
 
-    @Test("clear rejects double-clear")
-    func clearRejectsDouble() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.clear(side: .to)
-        #expect(throws: DomainError.invalidState("transfer side is not uncleared")) {
-            try transfer.clear(side: .to)
-        }
-    }
+        try legs.from.clear()
+        #expect(legs.from.status == .cleared)
+        #expect(legs.to.status == .uncleared)
 
-    @Test("unclear flips cleared to uncleared")
-    func unclearFlipsClearedToUncleared() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.clear(side: .from)
-        try transfer.unclear(side: .from)
-        #expect(transfer.fromStatus == .uncleared)
-    }
+        try legs.from.reconcile()
+        #expect(legs.from.status == .reconciled)
 
-    @Test("unclear fails on uncleared side")
-    func unclearFailsOnUncleared() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        #expect(throws: DomainError.invalidState("transfer side is not cleared")) {
-            try transfer.unclear(side: .from)
-        }
-    }
-
-    @Test("reconcile promotes cleared side to reconciled")
-    func reconcilePromotesCleared() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.clear(side: .to)
-        try transfer.reconcile(side: .to)
-        #expect(transfer.toStatus == .reconciled)
-        #expect(transfer.fromStatus == .uncleared)
-    }
-
-    @Test("reconcile rejects uncleared side")
-    func reconcileRejectsUncleared() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        #expect(throws: DomainError.invalidState("transfer side is not cleared")) {
-            try transfer.reconcile(side: .from)
-        }
-    }
-
-    @Test("status mutations fail on deleted transfer")
-    func statusMutationsFailOnDeleted() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.delete()
-        #expect(throws: DomainError.deleted) { try transfer.clear(side: .from) }
-        #expect(throws: DomainError.deleted) { try transfer.unclear(side: .from) }
-        #expect(throws: DomainError.deleted) { try transfer.reconcile(side: .from) }
-    }
-
-    // MARK: - Delete / undelete
-
-    @Test("delete marks transfer deleted")
-    func deleteMarks() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.delete()
-        #expect(transfer.isDeleted)
-    }
-
-    @Test("delete twice fails")
-    func deleteTwiceFails() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.delete()
-        #expect(throws: DomainError.deleted) { try transfer.delete() }
-    }
-
-    @Test("undelete restores the transfer")
-    func undeleteRestores() throws {
-        var transfer = try Transfer.create(fromAccountID: from, toAccountID: to, amount: 10, date: today)
-        try transfer.delete()
-        transfer.undelete()
-        #expect(transfer.isDeleted == false)
-        try transfer.update(amount: 20, date: today)
-        #expect(transfer.amount == 20)
+        try legs.to.clear()
+        try legs.to.unclear()
+        #expect(legs.to.status == .uncleared)
     }
 }

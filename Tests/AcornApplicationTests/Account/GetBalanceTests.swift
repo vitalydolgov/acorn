@@ -9,18 +9,19 @@ struct GetBalanceTests {
     private struct SUT {
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
-        let transfers: InMemoryTransferRepository
         let getBalance: GetBalance
+        let recordTransfer: RecordTransfer
+        let clearTransaction: ClearTransaction
 
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.accounts = accounts
             self.transactions = transactions
-            self.transfers = transfers
             self.getBalance = GetBalance(unitOfWork: uow)
+            self.recordTransfer = RecordTransfer(unitOfWork: uow)
+            self.clearTransaction = ClearTransaction(unitOfWork: uow)
         }
     }
 
@@ -53,21 +54,20 @@ struct GetBalanceTests {
         #expect(balances.working == 70)
     }
 
-    @Test("applies transfers in the correct direction with per-side status")
+    @Test("applies transfer legs in the correct direction with per-leg status")
     func transfers() async throws {
         let sut = SUT()
         let checking = try Account.make(name: "Checking", notes: "")
         let savings = try Account.make(name: "Savings", notes: "")
         try await sut.accounts.save(checking)
         try await sut.accounts.save(savings)
-        var transfer = try Transfer.create(
+        let legs = try await sut.recordTransfer(
             fromAccountID: checking.id,
             toAccountID: savings.id,
             amount: 50,
             date: .today()
         )
-        try transfer.clear(side: .from)
-        try await sut.transfers.save(transfer)
+        try await sut.clearTransaction(transactionID: legs.from.id)
 
         let checkingBalances = try await sut.getBalance(accountID: checking.id)
         #expect(checkingBalances.cleared == -50)

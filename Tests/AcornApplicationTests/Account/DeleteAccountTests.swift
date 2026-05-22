@@ -12,31 +12,30 @@ struct DeleteAccountTests {
         // Repos
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
-        let transfers: InMemoryTransferRepository
 
         // Services
         let openAccount: OpenAccount
         let addTransaction: AddTransaction
         let recordTransfer: RecordTransfer
+        let deleteTransfer: DeleteTransfer
         let closeAccount: CloseAccount
         let deleteAccount: DeleteAccount
 
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
-            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions, transfers: transfers)
+            let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
 
             // Repos
             self.accounts = accounts
             self.transactions = transactions
-            self.transfers = transfers
 
             // Services
             self.openAccount = OpenAccount(unitOfWork: uow)
             self.addTransaction = AddTransaction(unitOfWork: uow)
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
+            self.deleteTransfer = DeleteTransfer(unitOfWork: uow)
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
                 todayProvider: FixedTodayProvider(date: .today())
@@ -106,7 +105,7 @@ struct DeleteAccountTests {
         }
     }
 
-    @Test("ignores soft-deleted transactions and transfers")
+    @Test("ignores soft-deleted transactions and transfer legs")
     func ignoresSoftDeletedHistory() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
@@ -115,15 +114,14 @@ struct DeleteAccountTests {
         var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
-        let transfer = try await sut.recordTransfer(
+        let legs = try await sut.recordTransfer(
             fromAccountID: account.id,
             toAccountID: other.id,
             amount: 5,
             date: .today()
         )
-        var deletedTransfer = try await sut.transfers.fetch(id: transfer.id)!
-        try deletedTransfer.delete()
-        try await sut.transfers.save(deletedTransfer)
+        let transferID = try #require(legs.from.transferID)
+        try await sut.deleteTransfer(transferID: transferID)
 
         try await sut.deleteAccount(accountID: account.id)
 

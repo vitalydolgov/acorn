@@ -21,12 +21,10 @@ struct ReopenAccountTests {
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
-            let transfers = InMemoryTransferRepository()
 
             self.uow = InMemoryUnitOfWork(
                 accounts: accounts,
-                transactions: transactions,
-                transfers: transfers
+                transactions: transactions
             )
             self.todayProvider = FixedTodayProvider(date: .today())
 

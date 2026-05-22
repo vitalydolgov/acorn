@@ -4,7 +4,6 @@ import AcornDomain
 public protocol RepositoryContext {
     var accounts: any AccountRepository { get }
     var transactions: any TransactionRepository { get }
-    var transfers: any TransferRepository { get }
 }
 
 /// A single transactional scope over the repositories.

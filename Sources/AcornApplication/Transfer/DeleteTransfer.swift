@@ -10,10 +10,13 @@ public struct DeleteTransfer: Sendable {
 
     @UnitOfWork
     public func callAsFunction(transferID: UUID) async throws {
-        guard var transfer = try await ctx.transfers.fetch(id: transferID) else {
+        let legs = try await ctx.transactions.fetch(transferID: transferID)
+        guard !legs.isEmpty else {
             throw ApplicationError.notFound(transferID)
         }
-        try transfer.delete()
-        try await ctx.transfers.save(transfer)
+        for var leg in legs {
+            try leg.delete()
+            try await ctx.transactions.save(leg)
+        }
     }
 }
