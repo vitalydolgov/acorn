@@ -45,7 +45,7 @@ The application layer exposes the budgeting features as use cases that a UI or t
 
 **Transfers**
 
-A transfer moves money between two of your own accounts. It is not a standalone concept: Acorn records it as two linked entries — an outflow from the source and a matching inflow into the destination — kept bound together so the balances always agree and a transfer is never left half-recorded.
+A transfer moves money between two of your own accounts. It is not a standalone concept: it is recorded as two linked entries — an outflow from the source and a matching inflow into the destination — kept bound together so the balances always agree and a transfer is never left half-recorded.
 
 - Record a transfer between two distinct accounts for a positive amount.
 - Change a transfer's amount or date, applied to both sides at once.
