@@ -4,8 +4,8 @@ import Testing
 import AcornInMemory
 import AcornDomain
 
-@Suite("OpenAccount")
-struct OpenAccountTests {
+@Suite("AddAccount")
+struct AddAccountTests {
     private struct SUT {
         let uow: InMemoryUnitOfWork
 
@@ -14,7 +14,7 @@ struct OpenAccountTests {
         let transactions: InMemoryTransactionRepository
 
         // Services
-        let openAccount: OpenAccount
+        let addAccount: AddAccount
 
         init() {
             let accounts = InMemoryAccountRepository()
@@ -27,7 +27,7 @@ struct OpenAccountTests {
             self.transactions = transactions
 
             // Services
-            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addAccount = AddAccount(unitOfWork: uow)
         }
     }
 
@@ -35,7 +35,7 @@ struct OpenAccountTests {
     func opensWithNameAndNotes() async throws {
         let sut = SUT()
 
-        let account = try await sut.openAccount(name: "Checking", notes: "Primary")
+        let account = try await sut.addAccount(name: "Checking", notes: "Primary")
 
         #expect(account.name == "Checking")
         #expect(account.notes == "Primary")
@@ -50,7 +50,7 @@ struct OpenAccountTests {
     func openWritesNoTransactions() async throws {
         let sut = SUT()
 
-        let account = try await sut.openAccount(name: "Savings")
+        let account = try await sut.addAccount(name: "Savings")
         let txs = try await sut.transactions.fetchActive(forAccount: account.id)
 
         #expect(txs.isEmpty)
@@ -61,7 +61,7 @@ struct OpenAccountTests {
         let sut = SUT()
 
         await #expect(throws: DomainError.invalidArgument("name must not be blank")) {
-            _ = try await sut.openAccount(name: "   ")
+            _ = try await sut.addAccount(name: "   ")
         }
         #expect(try await sut.accounts.fetchActive().isEmpty)
     }

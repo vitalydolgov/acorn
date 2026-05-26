@@ -8,11 +8,11 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func openAccount(_ command: OpenAccount) -> Tool {
+    public static func addAccount(_ command: AddAccount) -> Tool {
         Tool(
-            name: "open_account",
+            name: "add_account",
             description: """
-                Open a new account with the given name and optional notes. \
+                Add a new account with the given name and optional notes. \
                 Returns the created account's id, name, and is_closed flag — \
                 use the id for subsequent operations.
                 """,

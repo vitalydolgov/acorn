@@ -132,14 +132,14 @@ struct AccountToolsTests {
         #expect(outcome.isError == true)
     }
 
-    @Test("open_account creates the account and returns its descriptor")
-    func openAccount() async throws {
+    @Test("add_account creates the account and returns its descriptor")
+    func addAccount() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.openAccount(OpenAccount(unitOfWork: uow)))
+        await catalog.register(.addAccount(AddAccount(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "open_account",
+            name: "add_account",
             args: .object(["name": .string("Checking"), "notes": .string("primary")])
         )
 
@@ -152,14 +152,14 @@ struct AccountToolsTests {
         #expect(stored?.name == "Checking")
     }
 
-    @Test("open_account fails on a blank name")
-    func openAccountBlankName() async throws {
+    @Test("add_account fails on a blank name")
+    func addAccountBlankName() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.openAccount(OpenAccount(unitOfWork: uow)))
+        await catalog.register(.addAccount(AddAccount(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "open_account",
+            name: "add_account",
             args: .object(["name": .string("   ")])
         )
 
@@ -191,7 +191,7 @@ struct AccountToolsTests {
     @Test("reopen_account reopens a closed account")
     func reopenAccount() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
         try await CloseAccount(unitOfWork: uow, todayProvider: SystemTodayProvider())(
             accountID: account.id
         )
@@ -212,7 +212,7 @@ struct AccountToolsTests {
     @Test("update_account renames and replaces notes")
     func updateAccount() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking", notes: "old")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking", notes: "old")
 
         let catalog = ToolCatalog()
         await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
@@ -235,7 +235,7 @@ struct AccountToolsTests {
     @Test("update_account with only notes leaves the name unchanged")
     func updateAccountNotesOnly() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Salary", notes: "old")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Salary", notes: "old")
 
         let catalog = ToolCatalog()
         await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
@@ -257,7 +257,7 @@ struct AccountToolsTests {
     @Test("update_account with only name leaves the notes unchanged")
     func updateAccountNameOnly() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Old", notes: "keep me")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Old", notes: "keep me")
 
         let catalog = ToolCatalog()
         await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
@@ -279,7 +279,7 @@ struct AccountToolsTests {
     @Test("update_account is a no-op when no fields are provided")
     func updateAccountNothingProvided() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Old", notes: "keep")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Old", notes: "keep")
         let before = try await uow.accounts.fetch(id: account.id)
 
         let catalog = ToolCatalog()
@@ -300,7 +300,7 @@ struct AccountToolsTests {
     @Test("delete_account removes an account with no activity")
     func deleteAccount() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
 
         let catalog = ToolCatalog()
         await catalog.register(.deleteAccount(DeleteAccount(unitOfWork: uow)))
@@ -318,7 +318,7 @@ struct AccountToolsTests {
     @Test("delete_account surfaces a failure when the account has activity")
     func deleteAccountWithActivityFails() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
         try await uow.transactions.save(
             Transaction.add(accountID: account.id, amount: 10, date: .today())
         )

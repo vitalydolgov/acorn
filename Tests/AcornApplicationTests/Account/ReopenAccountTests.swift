@@ -14,7 +14,7 @@ struct ReopenAccountTests {
         let accounts: InMemoryAccountRepository
 
         // Services
-        let openAccount: OpenAccount
+        let addAccount: AddAccount
         let closeAccount: CloseAccount
         let reopenAccount: ReopenAccount
 
@@ -32,7 +32,7 @@ struct ReopenAccountTests {
             self.accounts = accounts
 
             // Services
-            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addAccount = AddAccount(unitOfWork: uow)
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
                 todayProvider: todayProvider
@@ -46,7 +46,7 @@ struct ReopenAccountTests {
     @Test("flips closed to open")
     func flipsClosedToOpen() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         try await sut.closeAccount(accountID: account.id)
 
         try await sut.reopenAccount(accountID: account.id)
@@ -66,7 +66,7 @@ struct ReopenAccountTests {
     @Test("fails when not closed")
     func failsWhenNotClosed() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
 
         await #expect(throws: DomainError.invalidState("account is not closed")) {
             try await sut.reopenAccount(accountID: account.id)
@@ -76,7 +76,7 @@ struct ReopenAccountTests {
     @Test("fails on a deleted account")
     func failsOnDeleted() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         try await sut.closeAccount(accountID: account.id)
         let closed = try #require(try await sut.accounts.fetch(id: account.id))
         var deleted = closed

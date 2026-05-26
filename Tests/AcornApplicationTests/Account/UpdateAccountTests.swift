@@ -13,7 +13,7 @@ struct UpdateAccountTests {
         let accounts: InMemoryAccountRepository
 
         // Services
-        let openAccount: OpenAccount
+        let addAccount: AddAccount
         let updateAccount: UpdateAccount
 
         init() {
@@ -26,7 +26,7 @@ struct UpdateAccountTests {
             self.accounts = accounts
 
             // Services
-            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addAccount = AddAccount(unitOfWork: uow)
             self.updateAccount = UpdateAccount(unitOfWork: uow)
         }
     }
@@ -34,7 +34,7 @@ struct UpdateAccountTests {
     @Test("updates name and notes")
     func updatesNameAndNotes() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Old", notes: "old notes")
+        let account = try await sut.addAccount(name: "Old", notes: "old notes")
 
         try await sut.updateAccount(accountID: account.id, name: "New", notes: "new notes")
 
@@ -55,7 +55,7 @@ struct UpdateAccountTests {
     @Test("fails on a deleted account")
     func failsOnDeleted() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Old")
+        let account = try await sut.addAccount(name: "Old")
         var deleted = try await sut.accounts.fetch(id: account.id)!
         try deleted.delete()
         try await sut.accounts.save(deleted)
@@ -68,7 +68,7 @@ struct UpdateAccountTests {
     @Test("rejects empty name")
     func rejectsEmptyName() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Old")
+        let account = try await sut.addAccount(name: "Old")
 
         await #expect(throws: DomainError.self) {
             try await sut.updateAccount(accountID: account.id, name: "   ", notes: "")
@@ -80,7 +80,7 @@ struct UpdateAccountTests {
     @Test("updating notes only leaves the name unchanged")
     func notesOnlyPreservesName() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Salary", notes: "old rule")
+        let account = try await sut.addAccount(name: "Salary", notes: "old rule")
 
         try await sut.updateAccount(accountID: account.id, notes: "new rule")
 
@@ -92,7 +92,7 @@ struct UpdateAccountTests {
     @Test("updating name only leaves the notes unchanged")
     func nameOnlyPreservesNotes() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Old", notes: "keep me")
+        let account = try await sut.addAccount(name: "Old", notes: "keep me")
 
         try await sut.updateAccount(accountID: account.id, name: "New")
 
@@ -104,7 +104,7 @@ struct UpdateAccountTests {
     @Test("an explicit empty notes string clears the notes")
     func emptyStringClearsNotes() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Acct", notes: "has rules")
+        let account = try await sut.addAccount(name: "Acct", notes: "has rules")
 
         try await sut.updateAccount(accountID: account.id, notes: "")
 
@@ -116,7 +116,7 @@ struct UpdateAccountTests {
     @Test("is a no-op when neither name nor notes is provided")
     func noOpWhenNothingProvided() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "Old", notes: "keep")
+        let account = try await sut.addAccount(name: "Old", notes: "keep")
         let before = try await sut.accounts.fetch(id: account.id)
 
         try await sut.updateAccount(accountID: account.id)

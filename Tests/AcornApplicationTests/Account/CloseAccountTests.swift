@@ -17,7 +17,7 @@ struct CloseAccountTests {
         let transactions: InMemoryTransactionRepository
 
         // Services
-        let openAccount: OpenAccount
+        let addAccount: AddAccount
         let recordTransaction: RecordTransaction
         let recordTransfer: RecordTransfer
         let closeAccount: CloseAccount
@@ -37,7 +37,7 @@ struct CloseAccountTests {
             self.transactions = transactions
 
             // Services
-            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addAccount = AddAccount(unitOfWork: uow)
             self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
             self.closeAccount = CloseAccount(
@@ -52,7 +52,7 @@ struct CloseAccountTests {
     @Test("zero balance closes the account and posts no adjustment")
     func zeroBalanceClosesCleanly() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
 
         try await sut.closeAccount(accountID: account.id)
 
@@ -65,7 +65,7 @@ struct CloseAccountTests {
     @Test("positive balance posts negative adjustment and closes")
     func positiveBalanceZeroesAndCloses() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         _ = try await sut.recordTransaction(accountID: account.id, amount: 100, date: sut.today)
 
         try await sut.closeAccount(accountID: account.id)
@@ -87,7 +87,7 @@ struct CloseAccountTests {
     @Test("negative balance posts positive adjustment and closes")
     func negativeBalanceZeroesAndCloses() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         _ = try await sut.recordTransaction(accountID: account.id, amount: -40, date: sut.today)
 
         try await sut.closeAccount(accountID: account.id)
@@ -101,8 +101,8 @@ struct CloseAccountTests {
     @Test("considers transfer legs when computing balance")
     func transferContributesToBalance() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
-        let other = try await sut.openAccount(name: "B")
+        let account = try await sut.addAccount(name: "A")
+        let other = try await sut.addAccount(name: "B")
         _ = try await sut.recordTransfer(
             fromAccountID: other.id,
             toAccountID: account.id,
@@ -123,7 +123,7 @@ struct CloseAccountTests {
     @Test("ignores soft-deleted transactions when computing balance")
     func softDeletedTransactionsIgnored() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         let tx = try await sut.recordTransaction(accountID: account.id, amount: 50, date: sut.today)
         var deleted = try await sut.transactions.fetch(id: tx.id)!
         try deleted.delete()
@@ -148,7 +148,7 @@ struct CloseAccountTests {
     @Test("fails when account is already closed")
     func failsWhenAlreadyClosed() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         try await sut.closeAccount(accountID: account.id)
 
         await #expect(throws: DomainError.invalidState("account is already closed")) {
@@ -159,7 +159,7 @@ struct CloseAccountTests {
     @Test("rolls back the zeroing adjustment when the account save fails")
     func rollbackOnAccountSaveFailure() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         _ = try await sut.recordTransaction(accountID: account.id, amount: 100, date: sut.today)
         sut.accounts.saveHook = { _ in throw InjectedFailure() }
 
@@ -176,7 +176,7 @@ struct CloseAccountTests {
     @Test("fails on a deleted account")
     func failsOnDeleted() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         var deleted = try await sut.accounts.fetch(id: account.id)!
         try deleted.delete()
         try await sut.accounts.save(deleted)

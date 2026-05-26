@@ -14,7 +14,7 @@ struct DeleteAccountTests {
         let transactions: InMemoryTransactionRepository
 
         // Services
-        let openAccount: OpenAccount
+        let addAccount: AddAccount
         let recordTransaction: RecordTransaction
         let recordTransfer: RecordTransfer
         let deleteTransfer: DeleteTransfer
@@ -32,7 +32,7 @@ struct DeleteAccountTests {
             self.transactions = transactions
 
             // Services
-            self.openAccount = OpenAccount(unitOfWork: uow)
+            self.addAccount = AddAccount(unitOfWork: uow)
             self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
             self.deleteTransfer = DeleteTransfer(unitOfWork: uow)
@@ -56,7 +56,7 @@ struct DeleteAccountTests {
     @Test("allowed on empty account")
     func allowedOnEmpty() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
 
         try await sut.deleteAccount(accountID: account.id)
 
@@ -67,7 +67,7 @@ struct DeleteAccountTests {
     @Test("blocked when balance is non-zero")
     func blockedByNonZeroBalance() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         _ = try await sut.recordTransaction(accountID: account.id, amount: 10, date: .today())
 
         await #expect(throws: ApplicationError.policyViolation("account cannot be deleted")) {
@@ -78,7 +78,7 @@ struct DeleteAccountTests {
     @Test("allowed after close zeros the balance")
     func allowedAfterClose() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         _ = try await sut.recordTransaction(accountID: account.id, amount: 100, date: .today())
         try await sut.closeAccount(accountID: account.id)
 
@@ -91,8 +91,8 @@ struct DeleteAccountTests {
     @Test("blocked when a transfer references the account")
     func blockedByTransfer() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
-        let other = try await sut.openAccount(name: "B")
+        let account = try await sut.addAccount(name: "A")
+        let other = try await sut.addAccount(name: "B")
         _ = try await sut.recordTransfer(
             fromAccountID: account.id,
             toAccountID: other.id,
@@ -108,8 +108,8 @@ struct DeleteAccountTests {
     @Test("ignores soft-deleted transactions and transfer legs")
     func ignoresSoftDeletedHistory() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
-        let other = try await sut.openAccount(name: "B")
+        let account = try await sut.addAccount(name: "A")
+        let other = try await sut.addAccount(name: "B")
         let tx = try await sut.recordTransaction(accountID: account.id, amount: 10, date: .today())
         var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
@@ -132,7 +132,7 @@ struct DeleteAccountTests {
     @Test("fails when already deleted")
     func failsWhenAlreadyDeleted() async throws {
         let sut = SUT()
-        let account = try await sut.openAccount(name: "A")
+        let account = try await sut.addAccount(name: "A")
         try await sut.deleteAccount(accountID: account.id)
 
         await #expect(throws: DomainError.deleted) {
