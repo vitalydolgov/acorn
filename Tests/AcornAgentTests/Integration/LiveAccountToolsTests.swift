@@ -73,21 +73,21 @@ struct LiveAccountToolsTests {
         #expect(reply.contains("250"))
     }
 
-    @Test("real model partially updates an account without reading it first", .requiresLLM)
-    func partiallyUpdatesAccount() async throws {
+    @Test("real model renames an account without reading it first", .requiresLLM)
+    func renamesAccount() async throws {
         let uow = InMemoryUnitOfWork()
         let checking = try Account.make(name: "Checking", notes: "primary spending")
         try await uow.accounts.save(checking)
 
         let catalog = ToolCatalog()
         await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+        await catalog.register(.changeAccountName(ChangeAccountName(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         _ = try await session.send("Rename my Checking account to Everyday.")
 
         let names = await toolNames(session)
-        #expect(names.contains("update_account"))
+        #expect(names.contains("change_account_name"))
         #expect(!names.contains("get_account"))
 
         let stored = try await uow.accounts.fetch(id: checking.id)

@@ -209,61 +209,16 @@ struct AccountToolsTests {
         #expect(stored?.isClosed == false)
     }
 
-    @Test("update_account renames and replaces notes")
-    func updateAccount() async throws {
-        let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Checking", notes: "old")
-
-        let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
-
-        let outcome = await catalog.dispatch(
-            name: "update_account",
-            args: .object([
-                "account_id": .string(account.id.uuidString),
-                "name": .string("Everyday"),
-                "notes": .string("new")
-            ])
-        )
-
-        #expect(outcome.isError == false)
-        let stored = try await uow.accounts.fetch(id: account.id)
-        #expect(stored?.name == "Everyday")
-        #expect(stored?.notes == "new")
-    }
-
-    @Test("update_account with only notes leaves the name unchanged")
-    func updateAccountNotesOnly() async throws {
-        let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Salary", notes: "old")
-
-        let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
-
-        let outcome = await catalog.dispatch(
-            name: "update_account",
-            args: .object([
-                "account_id": .string(account.id.uuidString),
-                "notes": .string("rule: salary deposits only")
-            ])
-        )
-
-        #expect(outcome.isError == false)
-        let stored = try await uow.accounts.fetch(id: account.id)
-        #expect(stored?.name == "Salary")
-        #expect(stored?.notes == "rule: salary deposits only")
-    }
-
-    @Test("update_account with only name leaves the notes unchanged")
-    func updateAccountNameOnly() async throws {
+    @Test("change_account_name renames the account")
+    func changeAccountName() async throws {
         let uow = makeUoW()
         let account = try await AddAccount(unitOfWork: uow)(name: "Old", notes: "keep me")
 
         let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+        await catalog.register(.changeAccountName(ChangeAccountName(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "update_account",
+            name: "change_account_name",
             args: .object([
                 "account_id": .string(account.id.uuidString),
                 "name": .string("New")
@@ -276,25 +231,26 @@ struct AccountToolsTests {
         #expect(stored?.notes == "keep me")
     }
 
-    @Test("update_account is a no-op when no fields are provided")
-    func updateAccountNothingProvided() async throws {
+    @Test("update_account_metadata updates the notes")
+    func updateAccountMetadata() async throws {
         let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Old", notes: "keep")
-        let before = try await uow.accounts.fetch(id: account.id)
+        let account = try await AddAccount(unitOfWork: uow)(name: "Salary", notes: "old")
 
         let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+        await catalog.register(.updateAccountMetadata(UpdateAccountMetadata(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "update_account",
-            args: .object(["account_id": .string(account.id.uuidString)])
+            name: "update_account_metadata",
+            args: .object([
+                "account_id": .string(account.id.uuidString),
+                "notes": .string("rule: salary deposits only")
+            ])
         )
 
         #expect(outcome.isError == false)
         let stored = try await uow.accounts.fetch(id: account.id)
-        #expect(stored?.name == "Old")
-        #expect(stored?.notes == "keep")
-        #expect(stored?.version == before?.version)
+        #expect(stored?.name == "Salary")
+        #expect(stored?.notes == "rule: salary deposits only")
     }
 
     @Test("delete_account removes an account with no activity")
