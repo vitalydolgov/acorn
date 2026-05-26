@@ -4,8 +4,8 @@ import Testing
 import AcornInMemory
 import AcornDomain
 
-@Suite("UpdateTransaction")
-struct UpdateTransactionTests {
+@Suite("ChangeTransactionDate")
+struct ChangeTransactionDateTests {
     private struct SUT {
         let uow: InMemoryUnitOfWork
 
@@ -14,7 +14,7 @@ struct UpdateTransactionTests {
 
         // Services
         let recordTransaction: RecordTransaction
-        let updateTransaction: UpdateTransaction
+        let changeTransactionDate: ChangeTransactionDate
 
         let seedAccount: Account
 
@@ -29,7 +29,7 @@ struct UpdateTransactionTests {
 
             // Services
             self.recordTransaction = RecordTransaction(unitOfWork: uow)
-            self.updateTransaction = UpdateTransaction(unitOfWork: uow)
+            self.changeTransactionDate = ChangeTransactionDate(unitOfWork: uow)
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -40,16 +40,16 @@ struct UpdateTransactionTests {
 
     private static let today = AcornDate.today()
 
-    @Test("updates amount and date")
-    func updatesAmountAndDate() async throws {
+    @Test("updates date, preserving amount")
+    func updatesDate() async throws {
         let sut = try await SUT()
         let tx = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         let newDate = Self.today.adding(days: 1)
 
-        try await sut.updateTransaction(transactionID: tx.id, amount: 25, date: newDate)
+        try await sut.changeTransactionDate(transactionID: tx.id, date: newDate)
 
         let stored = try await sut.transactions.fetch(id: tx.id)
-        #expect(stored?.amount == 25)
+        #expect(stored?.amount == 10)
         #expect(stored?.date == newDate)
     }
 
@@ -58,7 +58,7 @@ struct UpdateTransactionTests {
         let sut = try await SUT()
 
         await #expect(throws: ApplicationError.self) {
-            try await sut.updateTransaction(transactionID: UUID(), amount: 1, date: Self.today)
+            try await sut.changeTransactionDate(transactionID: UUID(), date: Self.today)
         }
     }
 
@@ -71,7 +71,7 @@ struct UpdateTransactionTests {
         try await sut.transactions.save(deletedTx)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.updateTransaction(transactionID: tx.id, amount: 99, date: Self.today)
+            try await sut.changeTransactionDate(transactionID: tx.id, date: Self.today)
         }
     }
 
@@ -87,7 +87,7 @@ struct UpdateTransactionTests {
         try await sut.transactions.save(legs.from)
 
         await #expect(throws: ApplicationError.self) {
-            try await sut.updateTransaction(transactionID: legs.from.id, amount: 5, date: Self.today)
+            try await sut.changeTransactionDate(transactionID: legs.from.id, date: Self.today)
         }
     }
 }
