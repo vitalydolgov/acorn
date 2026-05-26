@@ -15,7 +15,7 @@ struct DeleteAccountTests {
 
         // Services
         let openAccount: OpenAccount
-        let addTransaction: AddTransaction
+        let recordTransaction: RecordTransaction
         let recordTransfer: RecordTransfer
         let deleteTransfer: DeleteTransfer
         let closeAccount: CloseAccount
@@ -33,7 +33,7 @@ struct DeleteAccountTests {
 
             // Services
             self.openAccount = OpenAccount(unitOfWork: uow)
-            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
             self.deleteTransfer = DeleteTransfer(unitOfWork: uow)
             self.closeAccount = CloseAccount(
@@ -68,7 +68,7 @@ struct DeleteAccountTests {
     func blockedByNonZeroBalance() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
+        _ = try await sut.recordTransaction(accountID: account.id, amount: 10, date: .today())
 
         await #expect(throws: ApplicationError.policyViolation("account cannot be deleted")) {
             try await sut.deleteAccount(accountID: account.id)
@@ -79,7 +79,7 @@ struct DeleteAccountTests {
     func allowedAfterClose() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.addTransaction(accountID: account.id, amount: 100, date: .today())
+        _ = try await sut.recordTransaction(accountID: account.id, amount: 100, date: .today())
         try await sut.closeAccount(accountID: account.id)
 
         try await sut.deleteAccount(accountID: account.id)
@@ -110,7 +110,7 @@ struct DeleteAccountTests {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
         let other = try await sut.openAccount(name: "B")
-        let tx = try await sut.addTransaction(accountID: account.id, amount: 10, date: .today())
+        let tx = try await sut.recordTransaction(accountID: account.id, amount: 10, date: .today())
         var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)

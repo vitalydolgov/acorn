@@ -13,7 +13,7 @@ struct ReconcileTransactionTests {
         let transactions: InMemoryTransactionRepository
 
         // Services
-        let addTransaction: AddTransaction
+        let recordTransaction: RecordTransaction
         let clearTransaction: ClearTransaction
         let reconcileTransaction: ReconcileTransaction
 
@@ -29,7 +29,7 @@ struct ReconcileTransactionTests {
             self.transactions = transactions
 
             // Services
-            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.clearTransaction = ClearTransaction(unitOfWork: uow)
             self.reconcileTransaction = ReconcileTransaction(unitOfWork: uow)
 
@@ -40,7 +40,7 @@ struct ReconcileTransactionTests {
         }
 
         func post() async throws -> Transaction {
-            try await addTransaction(accountID: seedAccount.id, amount: 10, date: .today())
+            try await recordTransaction(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 

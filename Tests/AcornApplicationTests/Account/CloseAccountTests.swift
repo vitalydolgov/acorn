@@ -18,7 +18,7 @@ struct CloseAccountTests {
 
         // Services
         let openAccount: OpenAccount
-        let addTransaction: AddTransaction
+        let recordTransaction: RecordTransaction
         let recordTransfer: RecordTransfer
         let closeAccount: CloseAccount
 
@@ -38,7 +38,7 @@ struct CloseAccountTests {
 
             // Services
             self.openAccount = OpenAccount(unitOfWork: uow)
-            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.recordTransfer = RecordTransfer(unitOfWork: uow)
             self.closeAccount = CloseAccount(
                 unitOfWork: uow,
@@ -66,7 +66,7 @@ struct CloseAccountTests {
     func positiveBalanceZeroesAndCloses() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.addTransaction(accountID: account.id, amount: 100, date: sut.today)
+        _ = try await sut.recordTransaction(accountID: account.id, amount: 100, date: sut.today)
 
         try await sut.closeAccount(accountID: account.id)
 
@@ -88,7 +88,7 @@ struct CloseAccountTests {
     func negativeBalanceZeroesAndCloses() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.addTransaction(accountID: account.id, amount: -40, date: sut.today)
+        _ = try await sut.recordTransaction(accountID: account.id, amount: -40, date: sut.today)
 
         try await sut.closeAccount(accountID: account.id)
 
@@ -124,7 +124,7 @@ struct CloseAccountTests {
     func softDeletedTransactionsIgnored() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        let tx = try await sut.addTransaction(accountID: account.id, amount: 50, date: sut.today)
+        let tx = try await sut.recordTransaction(accountID: account.id, amount: 50, date: sut.today)
         var deleted = try await sut.transactions.fetch(id: tx.id)!
         try deleted.delete()
         try await sut.transactions.save(deleted)
@@ -160,7 +160,7 @@ struct CloseAccountTests {
     func rollbackOnAccountSaveFailure() async throws {
         let sut = SUT()
         let account = try await sut.openAccount(name: "A")
-        _ = try await sut.addTransaction(accountID: account.id, amount: 100, date: sut.today)
+        _ = try await sut.recordTransaction(accountID: account.id, amount: 100, date: sut.today)
         sut.accounts.saveHook = { _ in throw InjectedFailure() }
 
         await #expect(throws: InjectedFailure.self) {

@@ -13,7 +13,7 @@ struct UpdateTransactionTests {
         let transactions: InMemoryTransactionRepository
 
         // Services
-        let addTransaction: AddTransaction
+        let recordTransaction: RecordTransaction
         let updateTransaction: UpdateTransaction
 
         let seedAccount: Account
@@ -28,7 +28,7 @@ struct UpdateTransactionTests {
             self.transactions = transactions
 
             // Services
-            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.updateTransaction = UpdateTransaction(unitOfWork: uow)
 
             var account = try Account.make(name: "Checking", notes: "")
@@ -43,7 +43,7 @@ struct UpdateTransactionTests {
     @Test("updates amount and date")
     func updatesAmountAndDate() async throws {
         let sut = try await SUT()
-        let tx = try await sut.addTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
+        let tx = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         let newDate = Self.today.adding(days: 1)
 
         try await sut.updateTransaction(transactionID: tx.id, amount: 25, date: newDate)
@@ -65,7 +65,7 @@ struct UpdateTransactionTests {
     @Test("fails on a deleted transaction")
     func failsOnDeleted() async throws {
         let sut = try await SUT()
-        let tx = try await sut.addTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
+        let tx = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)

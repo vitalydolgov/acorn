@@ -1,7 +1,7 @@
 import Foundation
 import AcornDomain
 
-public struct AddTransaction: Sendable {
+public struct RecordTransaction: Sendable {
     private let unitOfWork: any UnitOfWork
 
     public init(unitOfWork: any UnitOfWork) {

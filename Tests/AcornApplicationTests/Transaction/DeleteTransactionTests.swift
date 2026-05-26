@@ -13,7 +13,7 @@ struct DeleteTransactionTests {
         let transactions: InMemoryTransactionRepository
 
         // Services
-        let addTransaction: AddTransaction
+        let recordTransaction: RecordTransaction
         let deleteTransaction: DeleteTransaction
 
         let seedAccount: Account
@@ -28,7 +28,7 @@ struct DeleteTransactionTests {
             self.transactions = transactions
 
             // Services
-            self.addTransaction = AddTransaction(unitOfWork: uow)
+            self.recordTransaction = RecordTransaction(unitOfWork: uow)
             self.deleteTransaction = DeleteTransaction(unitOfWork: uow)
 
             var account = try Account.make(name: "Checking", notes: "")
@@ -38,7 +38,7 @@ struct DeleteTransactionTests {
         }
 
         func post() async throws -> Transaction {
-            try await addTransaction(accountID: seedAccount.id, amount: 10, date: .today())
+            try await recordTransaction(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 
