@@ -25,16 +25,37 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 - `AcornAgent` — exposes application use cases to an LLM as tools.
 - `AcornInMemory` — in-memory persistence implementation. Shared test store, not a production adapter.
 
-## Transfers
+## Application layer
 
-A transfer moves money between two of your own accounts. Acorn does not model it as a standalone concept: a transfer is recorded as two linked entries — an outflow from the source account and a matching inflow into the destination. The intent is to keep the two sides bound together so the accounts' balances always agree and a transfer can never be left half-recorded or with its sides out of step.
+The application layer exposes the budgeting features as use cases that a UI or the LLM agent drives. What's covered today, in domain terms:
 
-Covered from the domain side:
+**Accounts**
 
-- Recording a transfer between two distinct accounts for a positive amount.
-- Amending a transfer's amount or date, applied to both sides at once.
-- Deleting a transfer, removing both sides together.
-- Clearing, unclearing, and reconciling each side on its own as it settles.
+- Add an account with a name and optional notes; rename it or edit its notes.
+- Adjust an account to a known balance by posting a correcting entry.
+- Close an account — zeroing any remaining balance first — and reopen it later.
+- Delete an account once it holds no entries.
+
+**Transactions**
+
+- Record a transaction against an open account.
+- Change a transaction's amount or date.
+- Clear and unclear a transaction; reconcile a cleared one.
+- Delete a transaction.
+
+**Transfers**
+
+A transfer moves money between two of your own accounts. It is not a standalone concept: Acorn records it as two linked entries — an outflow from the source and a matching inflow into the destination — kept bound together so the balances always agree and a transfer is never left half-recorded.
+
+- Record a transfer between two distinct accounts for a positive amount.
+- Change a transfer's amount or date, applied to both sides at once.
+- Delete a transfer, removing both sides together.
+- Clear, unclear, and reconcile each side on its own as it settles.
+
+**Balances & lookup**
+
+- Read an account's cleared, uncleared, and working balances.
+- Fetch an account by id, resolve one by name (flagging ambiguous matches), and list all accounts.
 
 ## Testing
 
