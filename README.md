@@ -31,31 +31,31 @@ The application layer exposes the budgeting features as use cases that a UI or t
 
 **Accounts**
 
-- Add an account with a name and optional notes; rename it or edit its notes.
-- Adjust an account to a known balance by posting a correcting entry.
-- Close an account — zeroing any remaining balance first — and reopen it later.
-- Delete an account once it holds no entries.
+- Add an account with a name and optional notes; rename it or edit its notes (`AddAccount`, `ChangeAccountName`, `UpdateAccountMetadata`).
+- Adjust an account to a known balance by posting a correcting entry (`AdjustAccountBalance`).
+- Close an account — zeroing any remaining balance first — and reopen it later (`CloseAccount`, `ReopenAccount`).
+- Delete an account once it holds no entries (`DeleteAccount`).
 
 **Transactions**
 
-- Record a transaction against an open account.
-- Change a transaction's amount or date.
-- Clear and unclear a transaction; reconcile a cleared one.
-- Delete a transaction.
+- Record a transaction against an open account (`RecordTransaction`).
+- Change a transaction's amount or date (`ChangeTransactionAmount`, `ChangeTransactionDate`).
+- Clear and unclear a transaction; reconcile a cleared one (`ClearTransaction`, `UnclearTransaction`, `ReconcileTransaction`).
+- Delete a transaction (`DeleteTransaction`).
 
 **Transfers**
 
 A transfer moves money between two of your own accounts. It is not a standalone concept: it is recorded as two linked entries — an outflow from the source and a matching inflow into the destination — kept bound together so the balances always agree and a transfer is never left half-recorded.
 
-- Record a transfer between two distinct accounts for a positive amount.
-- Change a transfer's amount or date, applied to both sides at once.
-- Delete a transfer, removing both sides together.
-- Clear, unclear, and reconcile each side on its own as it settles.
+- Record a transfer between two distinct accounts for a positive amount (`RecordTransfer`).
+- Change a transfer's amount or date, applied to both sides at once (`ChangeTransferAmount`, `ChangeTransferDate`).
+- Delete a transfer, removing both sides together (`DeleteTransfer`).
+- Clear, unclear, and reconcile each side on its own as it settles (`ClearTransaction`, `UnclearTransaction`, `ReconcileTransaction`).
 
 **Balances & lookup**
 
-- Read an account's cleared, uncleared, and working balances.
-- Fetch an account by id, resolve one by name (flagging ambiguous matches), and list all accounts.
+- Read an account's cleared, uncleared, and working balances (`GetBalance`).
+- Fetch an account by id, resolve one by name (flagging ambiguous matches), and list all accounts (`GetAccount`, `GetAccountID`, `ListAccounts`).
 
 ## Testing
 
