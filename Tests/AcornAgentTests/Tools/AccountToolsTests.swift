@@ -79,8 +79,8 @@ struct AccountToolsTests {
         #expect(outcome.content.objectValue?["error"] != nil)
     }
 
-    @Test("get_balance reports cleared, uncleared, and working balances")
-    func getBalance() async throws {
+    @Test("calculate_balance reports cleared, uncleared, and working balances")
+    func calculateBalance() async throws {
         let uow = makeUoW()
         let checking = try Account.make(name: "Checking", notes: "")
         try await uow.accounts.save(checking)
@@ -92,10 +92,10 @@ struct AccountToolsTests {
         )
 
         let catalog = ToolCatalog()
-        await catalog.register(.getBalance(GetBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "get_balance",
+            name: "calculate_balance",
             args: .object(["account_id": .string(checking.id.uuidString)])
         )
 
@@ -107,39 +107,39 @@ struct AccountToolsTests {
         ]))
     }
 
-    @Test("get_balance fails when account_id is missing")
-    func getBalanceMissingArg() async throws {
+    @Test("calculate_balance fails when account_id is missing")
+    func calculateBalanceMissingArg() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.getBalance(GetBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
 
-        let outcome = await catalog.dispatch(name: "get_balance", args: .object([:]))
+        let outcome = await catalog.dispatch(name: "calculate_balance", args: .object([:]))
 
         #expect(outcome.isError == true)
     }
 
-    @Test("get_balance fails when account_id is not a UUID")
-    func getBalanceInvalidUUID() async throws {
+    @Test("calculate_balance fails when account_id is not a UUID")
+    func calculateBalanceInvalidUUID() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.getBalance(GetBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "get_balance",
+            name: "calculate_balance",
             args: .object(["account_id": .string("not-a-uuid")])
         )
 
         #expect(outcome.isError == true)
     }
 
-    @Test("open_account creates the account and returns its descriptor")
-    func openAccount() async throws {
+    @Test("add_account creates the account and returns its descriptor")
+    func addAccount() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.openAccount(OpenAccount(unitOfWork: uow)))
+        await catalog.register(.addAccount(AddAccount(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "open_account",
+            name: "add_account",
             args: .object(["name": .string("Checking"), "notes": .string("primary")])
         )
 
@@ -152,14 +152,14 @@ struct AccountToolsTests {
         #expect(stored?.name == "Checking")
     }
 
-    @Test("open_account fails on a blank name")
-    func openAccountBlankName() async throws {
+    @Test("add_account fails on a blank name")
+    func addAccountBlankName() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.openAccount(OpenAccount(unitOfWork: uow)))
+        await catalog.register(.addAccount(AddAccount(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "open_account",
+            name: "add_account",
             args: .object(["name": .string("   ")])
         )
 
@@ -191,7 +191,7 @@ struct AccountToolsTests {
     @Test("reopen_account reopens a closed account")
     func reopenAccount() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
         try await CloseAccount(unitOfWork: uow, todayProvider: SystemTodayProvider())(
             accountID: account.id
         )
@@ -209,61 +209,16 @@ struct AccountToolsTests {
         #expect(stored?.isClosed == false)
     }
 
-    @Test("update_account renames and replaces notes")
-    func updateAccount() async throws {
+    @Test("change_account_name renames the account")
+    func changeAccountName() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking", notes: "old")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Old", notes: "keep me")
 
         let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+        await catalog.register(.changeAccountName(ChangeAccountName(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "update_account",
-            args: .object([
-                "account_id": .string(account.id.uuidString),
-                "name": .string("Everyday"),
-                "notes": .string("new")
-            ])
-        )
-
-        #expect(outcome.isError == false)
-        let stored = try await uow.accounts.fetch(id: account.id)
-        #expect(stored?.name == "Everyday")
-        #expect(stored?.notes == "new")
-    }
-
-    @Test("update_account with only notes leaves the name unchanged")
-    func updateAccountNotesOnly() async throws {
-        let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Salary", notes: "old")
-
-        let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
-
-        let outcome = await catalog.dispatch(
-            name: "update_account",
-            args: .object([
-                "account_id": .string(account.id.uuidString),
-                "notes": .string("rule: salary deposits only")
-            ])
-        )
-
-        #expect(outcome.isError == false)
-        let stored = try await uow.accounts.fetch(id: account.id)
-        #expect(stored?.name == "Salary")
-        #expect(stored?.notes == "rule: salary deposits only")
-    }
-
-    @Test("update_account with only name leaves the notes unchanged")
-    func updateAccountNameOnly() async throws {
-        let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Old", notes: "keep me")
-
-        let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
-
-        let outcome = await catalog.dispatch(
-            name: "update_account",
+            name: "change_account_name",
             args: .object([
                 "account_id": .string(account.id.uuidString),
                 "name": .string("New")
@@ -276,31 +231,32 @@ struct AccountToolsTests {
         #expect(stored?.notes == "keep me")
     }
 
-    @Test("update_account is a no-op when no fields are provided")
-    func updateAccountNothingProvided() async throws {
+    @Test("update_account_metadata updates the notes")
+    func updateAccountMetadata() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Old", notes: "keep")
-        let before = try await uow.accounts.fetch(id: account.id)
+        let account = try await AddAccount(unitOfWork: uow)(name: "Salary", notes: "old")
 
         let catalog = ToolCatalog()
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+        await catalog.register(.updateAccountMetadata(UpdateAccountMetadata(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
-            name: "update_account",
-            args: .object(["account_id": .string(account.id.uuidString)])
+            name: "update_account_metadata",
+            args: .object([
+                "account_id": .string(account.id.uuidString),
+                "notes": .string("rule: salary deposits only")
+            ])
         )
 
         #expect(outcome.isError == false)
         let stored = try await uow.accounts.fetch(id: account.id)
-        #expect(stored?.name == "Old")
-        #expect(stored?.notes == "keep")
-        #expect(stored?.version == before?.version)
+        #expect(stored?.name == "Salary")
+        #expect(stored?.notes == "rule: salary deposits only")
     }
 
     @Test("delete_account removes an account with no activity")
     func deleteAccount() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
 
         let catalog = ToolCatalog()
         await catalog.register(.deleteAccount(DeleteAccount(unitOfWork: uow)))
@@ -318,7 +274,7 @@ struct AccountToolsTests {
     @Test("delete_account surfaces a failure when the account has activity")
     func deleteAccountWithActivityFails() async throws {
         let uow = makeUoW()
-        let account = try await OpenAccount(unitOfWork: uow)(name: "Checking")
+        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
         try await uow.transactions.save(
             Transaction.add(accountID: account.id, amount: 10, date: .today())
         )

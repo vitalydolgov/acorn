@@ -1,6 +1,6 @@
 # Acorn
 
-A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped to the **domain** and **application** layers — no UI. Domain operations run through a **dual interface**: a human user (UI) and an LLM agent that invokes the same application use cases as tools.
+A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped to the **domain** and **application** layers — no UI. Domain operations run through a **dual interface**: a human user (UI) and an LLM agent that invokes the same application use cases as tools. 
 
 ## Goals
 
@@ -36,16 +36,10 @@ swift test                       # offline suite
 ACORN_LLM_TESTS=1 swift test     # include paid live tests
 ```
 
-## Status
+## Documentation
 
-- [x] Accounts & transactions — full lifecycle, validation, balances
-- [x] Transfers & transactional integrity — Unit of Work, rollback, versioning
-- [x] LLM agent interface — application use cases exposed as tools
-- [ ] Budgeting core — categories, plans, payees
-- [ ] Reconciliation & undo
-- [ ] Scale & observability — domain events, pagination
-
-Persistence is intentionally out of scope: the library ships repository and `UnitOfWork` protocols, and the consuming app provides the adapter (Core Data, GRDB, SQLite, CloudKit, …) that fits its storage choice.
+- [Commands](Documentation/commands.md) — the state-changing operations (accounts, transactions, transfers) grouped by aggregate, in domain terms.
+- [Queries](Documentation/queries.md) — the read-only operations (balance calculations and account lookups) grouped by aggregate, in domain terms.
 
 ## Extending with UI
 

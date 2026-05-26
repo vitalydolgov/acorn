@@ -42,7 +42,7 @@ struct LiveAccountToolsJudgmentTests {
 
         let catalog = ToolCatalog()
         await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.getBalance(GetBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         _ = try await session.send("What's the balance of my Savings account?")
@@ -50,7 +50,7 @@ struct LiveAccountToolsJudgmentTests {
         let names = await toolNames(session)
         #expect(names.contains("get_account_id"))
         // Ambiguity must not be resolved into a balance lookup.
-        #expect(!names.contains("get_balance"))
+        #expect(!names.contains("calculate_balance"))
     }
 
     @Test("real model answers without tools when none are needed", .requiresLLM)

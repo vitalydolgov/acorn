@@ -47,7 +47,7 @@ struct LiveAccountToolsTests {
         #expect(await toolNames(session).contains("list_accounts"))
     }
 
-    @Test("real model chains get_account_id then get_balance", .requiresLLM)
+    @Test("real model chains get_account_id then calculate_balance", .requiresLLM)
     func chainsNameToBalance() async throws {
         let uow = InMemoryUnitOfWork()
         let checking = try Account.make(name: "Checking", notes: "")
@@ -58,36 +58,36 @@ struct LiveAccountToolsTests {
 
         let catalog = ToolCatalog()
         await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.getBalance(GetBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         let reply = try await session.send("What's the balance of my Checking account?")
 
         let names = await toolNames(session)
         #expect(names.contains("get_account_id"))
-        #expect(names.contains("get_balance"))
+        #expect(names.contains("calculate_balance"))
         if let idIdx = names.firstIndex(of: "get_account_id"),
-           let balIdx = names.firstIndex(of: "get_balance") {
+           let balIdx = names.firstIndex(of: "calculate_balance") {
             #expect(idIdx < balIdx)
         }
         #expect(reply.contains("250"))
     }
 
-    @Test("real model partially updates an account without reading it first", .requiresLLM)
-    func partiallyUpdatesAccount() async throws {
+    @Test("real model renames an account without reading it first", .requiresLLM)
+    func renamesAccount() async throws {
         let uow = InMemoryUnitOfWork()
         let checking = try Account.make(name: "Checking", notes: "primary spending")
         try await uow.accounts.save(checking)
 
         let catalog = ToolCatalog()
         await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.updateAccount(UpdateAccount(unitOfWork: uow)))
+        await catalog.register(.changeAccountName(ChangeAccountName(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         _ = try await session.send("Rename my Checking account to Everyday.")
 
         let names = await toolNames(session)
-        #expect(names.contains("update_account"))
+        #expect(names.contains("change_account_name"))
         #expect(!names.contains("get_account"))
 
         let stored = try await uow.accounts.fetch(id: checking.id)

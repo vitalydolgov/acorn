@@ -65,9 +65,69 @@ public struct Transaction: Versioned, Sendable {
         )
     }
 
+    /// Builds the two mirrored legs of a transfer: an outflow on the source
+    /// account and an inflow on the destination, linked by a shared transfer id.
+    package static func transfer(
+        fromAccountID: UUID,
+        toAccountID: UUID,
+        amount: Decimal,
+        date: AcornDate
+    ) throws -> (from: Transaction, to: Transaction) {
+        guard fromAccountID != toAccountID else {
+            throw DomainError.invalidArgument("source and destination must differ")
+        }
+        guard amount > 0 else {
+            throw DomainError.invalidArgument("amount must be positive")
+        }
+        let transferID = UUID()
+        let from = Transaction(
+            id: UUID(),
+            accountID: fromAccountID,
+            amount: -amount,
+            date: date,
+            status: .uncleared,
+            kind: .transfer(id: transferID, counterpartAccountID: toAccountID)
+        )
+        let to = Transaction(
+            id: UUID(),
+            accountID: toAccountID,
+            amount: amount,
+            date: date,
+            status: .uncleared,
+            kind: .transfer(id: transferID, counterpartAccountID: fromAccountID)
+        )
+        return (from, to)
+    }
+
+    public var transferID: UUID? {
+        if case let .transfer(id, _) = kind { return id }
+        return nil
+    }
+
+    public var counterpartAccountID: UUID? {
+        if case let .transfer(_, counterpartAccountID) = kind { return counterpartAccountID }
+        return nil
+    }
+
+    public var isTransferLeg: Bool {
+        if case .transfer = kind { return true }
+        return false
+    }
+
     package mutating func update(amount: Decimal, date: AcornDate) throws {
         guard !isDeleted else { throw DomainError.deleted }
         self.amount = amount
+        self.date = date
+    }
+
+    /// Revises a transfer leg from the transfer's positive magnitude, keeping the
+    /// leg's outflow/inflow direction.
+    package mutating func reviseTransferLeg(amount: Decimal, date: AcornDate) throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        guard amount > 0 else {
+            throw DomainError.invalidArgument("amount must be positive")
+        }
+        self.amount = self.amount < 0 ? -amount : amount
         self.date = date
     }
 
@@ -112,4 +172,5 @@ public enum TransactionStatus: Codable, Sendable {
 public enum TransactionKind: Codable, Equatable, Sendable {
     case regular
     case adjustment
+    case transfer(id: UUID, counterpartAccountID: UUID)
 }
