@@ -25,30 +25,16 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 - `AcornAgent` — exposes application use cases to an LLM as tools.
 - `AcornInMemory` — in-memory persistence implementation. Shared test store, not a production adapter.
 
-## Use cases
+## Transfers
 
-The application layer is one type per use case, split into state-changing **commands** and read-only **queries**, each grouped by aggregate:
+A transfer moves money between two of your own accounts. Acorn does not model it as a standalone concept: a transfer is recorded as two linked entries — an outflow from the source account and a matching inflow into the destination. The intent is to keep the two sides bound together so the accounts' balances always agree and a transfer can never be left half-recorded or with its sides out of step.
 
-```
-Sources/AcornApplication/
-  Commands/{Account,Transaction,Transfer}/
-  Queries/Account/
-  Shared/                       # UnitOfWork, ApplicationError
-```
+Covered from the domain side:
 
-Each use case is a struct invoked via `callAsFunction`, so call sites read like a function call; commands run under the `@UnitOfWork` macro for atomic commit/rollback. Commands return the entity they create (or nothing for edits); queries return plain value DTOs (e.g. `GetBalance.Balances`).
-
-Names state intent rather than CRUD:
-
-- **Create** — `RecordTransaction`, `RecordTransfer`, `AddAccount`.
-- **Edit one field** — `Change…` (`ChangeTransactionAmount`, `ChangeTransferDate`, `ChangeAccountName`).
-- `AdjustAccountBalance` posts a balance-correcting transaction; `UpdateAccountMetadata` edits incidental fields such as notes.
-- **Lifecycle** — `Clear`/`Unclear`/`Reconcile`/`Delete` a transaction; `Close`/`Reopen`/`Delete` an account.
-- **Queries** — `Get…` for a single result, `List…` for collections.
-
-### Transfers as linked transactions
-
-A transfer is not a separate aggregate. `RecordTransfer` creates two mirrored `Transaction` legs — an outflow on the source account and an inflow on the destination — linked by a shared transfer id (`TransactionKind.transfer`). The `Transfer…` use cases edit or delete both legs together; editing a leg through a `Transaction` use case is rejected. This keeps the two sides consistent without a dedicated aggregate.
+- Recording a transfer between two distinct accounts for a positive amount.
+- Amending a transfer's amount or date, applied to both sides at once.
+- Deleting a transfer, removing both sides together.
+- Clearing, unclearing, and reconciling each side on its own as it settles.
 
 ## Testing
 
