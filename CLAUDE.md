@@ -1,19 +1,54 @@
 # Acorn
 
-A Swift library for zero-based budgeting, inspired by YNAB's mechanics, scoped to the domain and application layers (no UI) with a DDD shape and tests as the primary validation vehicle; domain operations run through a dual interface, driven both by a human user (UI) and by an LLM agent that invokes the same application use cases as tools. 
+Zero-based budgeting library (YNAB-inspired) in Swift, covering domain and application layers only — no UI. Domain operations run through a **dual interface**: a human-driven UI and an LLM agent that calls the same application use cases as tools.
 
-Read `README.md` for goals and tech stack; learn structure and layout from the code itself.
+**Stack:** Swift 6.3
+
+## Modules
+
+| Module | Role |
+| --- | --- |
+| `AcornDomain` | Entities, repository protocols, calculations, domain errors |
+| `AcornApplication` | Command/query structs, cross-aggregate coordination, `UnitOfWork` protocol |
+| `AcornMacros` | `@UnitOfWork` body macro — compiler plugin that wraps methods in a unit-of-work scope |
+| `AcornAgent` | Wraps application use cases as LLM tools; owns chat session and tool dispatch |
+| `AcornInMemory` | In-memory repositories and `UnitOfWork`; used exclusively in tests |
+
+## Layout
+
+```
+AcornApplication/
+  Commands/   one struct per aggregate
+  Queries/    one struct per aggregate
+  Shared/     UnitOfWork · shared value types
+AcornAgent/
+  Tools/      one *Tool.swift per operation — each a static factory on Tool
+```
+
+## Key concepts
+
+**Unit of Work** — `@UnitOfWork` wraps a method body in `unitOfWork.perform { ctx in … }`, providing `ctx: RepositoryContext` for repository access. Every state change must go through it; never call repositories directly.
+
+**Commands** — one struct per aggregate (or coordinating domain concept), grouping all state-changing operations and holding shared dependencies once. Each method runs inside a unit of work.
+
+**Queries** — one struct per aggregate, grouping all read-only operations in the same shape as commands.
+
+**Agent tools** — each operation is a static factory on `Tool`, accepting the relevant command/query struct, defined as an extension in its own file.
 
 ## Conventions
 
-- Every state-changing use case runs inside a single atomic unit of work that grants repository access and commits or rolls back as a whole; never bypass it with direct repository calls.
-- Model each operation as its own type, invoked via `callAsFunction`. Keep state-changing commands separate from read-only queries, each grouped by the aggregate it serves (e.g. `Commands/`, `Queries/`), with shared plumbing kept apart.
-- Name a use case for the domain intent it expresses, not a generic CRUD verb: a create reads as `Record…`/`Add…`, a single-field edit as `Change…`, a correction as `Adjust…`, an incidental/metadata edit as `Update…`, and a state transition as a lifecycle verb (`Clear`/`Close`/`Reopen`/…). Reads use `Get…` for one result and `List…` for a collection, while a value derived by computation over an aggregate's data reads as `Calculate…`.
-- An invariant that spans more than one aggregate cannot be enforced by any single aggregate root: enforce it in the use case that coordinates the participants, inside one unit of work, and reject any operation that would change a participant in isolation. (Example: a transfer is not its own aggregate but two correlated transaction aggregates created, changed, and deleted together; editing one leg on its own is rejected.)
+- Swift 6, strict concurrency on. Domain types should be `Sendable` by construction (value types, no reference state).
+- Default to `internal`. Use `package` for declarations that must cross module boundaries within this package but should not be visible outside it. Use `public` only for what a presentation or infrastructure layer depending on this package would consume.
 
-## Docs
+## Tests
 
-Keep these in sync as you change the code:
+Mirror source layout; suites are named after the operation under test.
 
-- `Documentation/commands.md` and `Documentation/queries.md` — the catalogs of application operations grouped by aggregate (state-changing commands and read-only queries respectively). Update the matching doc whenever you add, rename, or remove an operation, or change what one does.
-- `README.md` — update the module list and the capability coverage named in the introduction when the layout or surface area changes.
+```sh
+swift test                        # offline suite
+ACORN_LLM_TESTS=1 swift test      # include live Anthropic API tests (paid)
+```
+
+## Documentation
+
+`README.md` — update the module list and capability coverage when layout or surface area changes.
