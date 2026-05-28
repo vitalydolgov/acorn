@@ -41,8 +41,8 @@ struct LiveAccountToolsJudgmentTests {
         try await uow.accounts.save(try Account.make(name: "Savings", notes: "personal"))
 
         let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
+        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         _ = try await session.send("What's the balance of my Savings account?")
@@ -56,7 +56,7 @@ struct LiveAccountToolsJudgmentTests {
     @Test("real model answers without tools when none are needed", .requiresLLM)
     func noToolWhenUnnecessary() async throws {
         let catalog = ToolCatalog()
-        await catalog.register(.listAccounts(ListAccounts(unitOfWork: InMemoryUnitOfWork())))
+        await catalog.register(.listAccounts(AccountQueries(unitOfWork: InMemoryUnitOfWork())))
 
         let session = try session(catalog: catalog)
         let reply = try await session.send("In one word, say hello.")

@@ -13,8 +13,8 @@ struct RecordTransactionTests {
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransaction: RecordTransaction
+        // Commands
+        let commands: TransactionCommands
 
         let seedAccount: Account
 
@@ -28,8 +28,11 @@ struct RecordTransactionTests {
             self.accounts = accounts
             self.transactions = transactions
 
-            // Services
-            self.recordTransaction = RecordTransaction(unitOfWork: uow)
+            // Commands
+            self.commands = TransactionCommands(
+                unitOfWork: uow,
+                transfers: TransferCommands(unitOfWork: uow)
+            )
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -44,13 +47,13 @@ struct RecordTransactionTests {
     func storesSignedAmount() async throws {
         let sut = try await SUT()
 
-        let inflow = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 50, date: Self.today)
+        let inflow = try await sut.commands.record(accountID: sut.seedAccount.id, amount: 50, date: Self.today)
         #expect(inflow.amount == 50)
         #expect(inflow.kind == .regular)
         let storedIn = try await sut.transactions.fetch(id: inflow.id)
         #expect(storedIn?.amount == 50)
 
-        let outflow = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: -30, date: Self.today)
+        let outflow = try await sut.commands.record(accountID: sut.seedAccount.id, amount: -30, date: Self.today)
         #expect(outflow.amount == -30)
         #expect(outflow.kind == .regular)
     }
@@ -60,7 +63,7 @@ struct RecordTransactionTests {
         let sut = try await SUT()
 
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.recordTransaction(accountID: UUID(), amount: 10, date: Self.today)
+            _ = try await sut.commands.record(accountID: UUID(), amount: 10, date: Self.today)
         }
     }
 
@@ -72,7 +75,7 @@ struct RecordTransactionTests {
         try await sut.accounts.save(closed)
 
         await #expect(throws: DomainError.invalidState("account is closed")) {
-            _ = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
+            _ = try await sut.commands.record(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         }
     }
 
@@ -84,7 +87,7 @@ struct RecordTransactionTests {
         try await sut.accounts.save(deleted)
 
         await #expect(throws: DomainError.deleted) {
-            _ = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
+            _ = try await sut.commands.record(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         }
     }
 }

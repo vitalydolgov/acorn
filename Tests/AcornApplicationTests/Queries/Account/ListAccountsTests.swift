@@ -8,21 +8,21 @@ import AcornDomain
 struct ListAccountsTests {
     private struct SUT {
         let accounts: InMemoryAccountRepository
-        let listAccounts: ListAccounts
+        let queries: AccountQueries
 
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
             let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.accounts = accounts
-            self.listAccounts = ListAccounts(unitOfWork: uow)
+            self.queries = AccountQueries(unitOfWork: uow)
         }
     }
 
     @Test("returns empty when there are no accounts")
     func empty() async throws {
         let sut = SUT()
-        let result = try await sut.listAccounts()
+        let result = try await sut.queries.list()
         #expect(result.isEmpty)
     }
 
@@ -33,7 +33,7 @@ struct ListAccountsTests {
         try await sut.accounts.save(try Account.make(name: "Checking", notes: ""))
         try await sut.accounts.save(try Account.make(name: "Brokerage", notes: ""))
 
-        let result = try await sut.listAccounts()
+        let result = try await sut.queries.list()
         #expect(result.map(\.name) == ["Brokerage", "Checking", "Savings"])
     }
 
@@ -45,7 +45,7 @@ struct ListAccountsTests {
         try deleted.delete()
         try await sut.accounts.save(deleted)
 
-        let result = try await sut.listAccounts()
+        let result = try await sut.queries.list()
         #expect(result.map(\.name) == ["Checking"])
     }
 
@@ -56,7 +56,7 @@ struct ListAccountsTests {
         try closed.close()
         try await sut.accounts.save(closed)
 
-        let result = try await sut.listAccounts()
+        let result = try await sut.queries.list()
         #expect(result.count == 1)
         #expect(result[0].isClosed == true)
     }

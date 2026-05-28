@@ -35,14 +35,15 @@ public struct Transaction: Versioned, Sendable {
     package static func add(
         accountID: UUID,
         amount: Decimal,
-        date: AcornDate
+        date: AcornDate,
+        cleared: Bool = false
     ) -> Transaction {
         Transaction(
             id: UUID(),
             accountID: accountID,
             amount: amount,
             date: date,
-            status: .uncleared,
+            status: cleared ? .cleared : .uncleared,
             kind: .regular
         )
     }
@@ -71,7 +72,8 @@ public struct Transaction: Versioned, Sendable {
         fromAccountID: UUID,
         toAccountID: UUID,
         amount: Decimal,
-        date: AcornDate
+        date: AcornDate,
+        clearedAccountID: UUID? = nil
     ) throws -> (from: Transaction, to: Transaction) {
         guard fromAccountID != toAccountID else {
             throw DomainError.invalidArgument("source and destination must differ")
@@ -85,7 +87,7 @@ public struct Transaction: Versioned, Sendable {
             accountID: fromAccountID,
             amount: -amount,
             date: date,
-            status: .uncleared,
+            status: fromAccountID == clearedAccountID ? .cleared : .uncleared,
             kind: .transfer(id: transferID, counterpartAccountID: toAccountID)
         )
         let to = Transaction(
@@ -93,7 +95,7 @@ public struct Transaction: Versioned, Sendable {
             accountID: toAccountID,
             amount: amount,
             date: date,
-            status: .uncleared,
+            status: toAccountID == clearedAccountID ? .cleared : .uncleared,
             kind: .transfer(id: transferID, counterpartAccountID: fromAccountID)
         )
         return (from, to)
@@ -162,6 +164,14 @@ public struct Transaction: Versioned, Sendable {
             throw DomainError.invalidState("transaction is not cleared")
         }
         status = .uncleared
+    }
+
+    package mutating func setCleared(_ cleared: Bool) throws {
+        switch (status, cleared) {
+        case (.uncleared, true): try clear()
+        case (.cleared, false): try unclear()
+        default: break
+        }
     }
 }
 

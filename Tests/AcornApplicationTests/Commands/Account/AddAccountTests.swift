@@ -13,8 +13,8 @@ struct AddAccountTests {
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let addAccount: AddAccount
+        // Commands
+        let commands: AccountCommands
 
         init() {
             let accounts = InMemoryAccountRepository()
@@ -26,8 +26,8 @@ struct AddAccountTests {
             self.accounts = accounts
             self.transactions = transactions
 
-            // Services
-            self.addAccount = AddAccount(unitOfWork: uow)
+            // Commands
+            self.commands = AccountCommands(unitOfWork: uow, todayProvider: FixedTodayProvider(date: .today()))
         }
     }
 
@@ -35,7 +35,7 @@ struct AddAccountTests {
     func opensWithNameAndNotes() async throws {
         let sut = SUT()
 
-        let account = try await sut.addAccount(name: "Checking", notes: "Primary")
+        let account = try await sut.commands.add(name: "Checking", notes: "Primary")
 
         #expect(account.name == "Checking")
         #expect(account.notes == "Primary")
@@ -50,7 +50,7 @@ struct AddAccountTests {
     func openWritesNoTransactions() async throws {
         let sut = SUT()
 
-        let account = try await sut.addAccount(name: "Savings")
+        let account = try await sut.commands.add(name: "Savings")
         let txs = try await sut.transactions.fetchActive(forAccount: account.id)
 
         #expect(txs.isEmpty)
@@ -61,7 +61,7 @@ struct AddAccountTests {
         let sut = SUT()
 
         await #expect(throws: DomainError.invalidArgument("name must not be blank")) {
-            _ = try await sut.addAccount(name: "   ")
+            _ = try await sut.commands.add(name: "   ")
         }
         #expect(try await sut.accounts.fetchActive().isEmpty)
     }

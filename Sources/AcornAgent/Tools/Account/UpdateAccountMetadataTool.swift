@@ -12,7 +12,7 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func updateAccountMetadata(_ command: UpdateAccountMetadata) -> Tool {
+    public static func updateAccountMetadata(_ commands: AccountCommands) -> Tool {
         Tool(
             name: "update_account_metadata",
             description: """
@@ -31,7 +31,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                try await command(accountID: input.accountID, notes: input.notes)
+                try await commands.updateMetadata(accountID: input.accountID, notes: input.notes)
                 return .object(["ok": .bool(true)])
             }
         )

@@ -12,8 +12,8 @@ struct TransferLegStatusTests {
     private struct SUT {
         let uow: InMemoryUnitOfWork
         let transactions: InMemoryTransactionRepository
-        let recordTransfer: RecordTransfer
-        let clearTransaction: ClearTransaction
+        let transferCommands: TransferCommands
+        let transactionCommands: TransactionCommands
         let seedFrom: Account
         let seedTo: Account
 
@@ -23,8 +23,8 @@ struct TransferLegStatusTests {
             let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.uow = uow
             self.transactions = transactions
-            self.recordTransfer = RecordTransfer(unitOfWork: uow)
-            self.clearTransaction = ClearTransaction(unitOfWork: uow)
+            self.transferCommands = TransferCommands(unitOfWork: uow)
+            self.transactionCommands = TransactionCommands(unitOfWork: uow, transfers: transferCommands)
 
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")
@@ -40,14 +40,14 @@ struct TransferLegStatusTests {
     @Test("clearing one leg leaves the counterpart untouched")
     func clearsOneLegIndependently() async throws {
         let sut = try await SUT()
-        let legs = try await sut.recordTransfer(
+        let legs = try await sut.transferCommands.record(
             fromAccountID: sut.seedFrom.id,
             toAccountID: sut.seedTo.id,
             amount: 40,
             date: .today()
         )
 
-        try await sut.clearTransaction(transactionID: legs.from.id)
+        try await sut.transactionCommands.clear(transactionID: legs.from.id)
 
         let from = try #require(try await sut.transactions.fetch(id: legs.from.id))
         let to = try #require(try await sut.transactions.fetch(id: legs.to.id))

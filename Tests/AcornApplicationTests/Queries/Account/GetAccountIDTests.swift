@@ -8,14 +8,14 @@ import AcornDomain
 struct GetAccountIDTests {
     private struct SUT {
         let accounts: InMemoryAccountRepository
-        let getAccountID: GetAccountID
+        let queries: AccountQueries
 
         init() {
             let accounts = InMemoryAccountRepository()
             let transactions = InMemoryTransactionRepository()
             let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.accounts = accounts
-            self.getAccountID = GetAccountID(unitOfWork: uow)
+            self.queries = AccountQueries(unitOfWork: uow)
         }
     }
 
@@ -26,7 +26,7 @@ struct GetAccountIDTests {
         try await sut.accounts.save(checking)
         try await sut.accounts.save(try Account.make(name: "Savings", notes: ""))
 
-        let result = try await sut.getAccountID(name: "Checking")
+        let result = try await sut.queries.getID(name: "Checking")
         guard case let .found(id) = result else {
             Issue.record("expected .found")
             return
@@ -40,7 +40,7 @@ struct GetAccountIDTests {
         let checking = try Account.make(name: "Checking", notes: "")
         try await sut.accounts.save(checking)
 
-        let result = try await sut.getAccountID(name: "checking")
+        let result = try await sut.queries.getID(name: "checking")
         guard case let .found(id) = result else {
             Issue.record("expected .found")
             return
@@ -54,7 +54,7 @@ struct GetAccountIDTests {
         try await sut.accounts.save(try Account.make(name: "Checking", notes: ""))
         try await sut.accounts.save(try Account.make(name: "Checking", notes: ""))
 
-        let result = try await sut.getAccountID(name: "Checking")
+        let result = try await sut.queries.getID(name: "Checking")
         guard case let .ambiguous(candidates) = result else {
             Issue.record("expected .ambiguous")
             return
@@ -67,7 +67,7 @@ struct GetAccountIDTests {
         let sut = SUT()
         try await sut.accounts.save(try Account.make(name: "Checking", notes: ""))
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.getAccountID(name: "Savings")
+            _ = try await sut.queries.getID(name: "Savings")
         }
     }
 
@@ -79,7 +79,7 @@ struct GetAccountIDTests {
         try await sut.accounts.save(deleted)
 
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.getAccountID(name: "Checking")
+            _ = try await sut.queries.getID(name: "Checking")
         }
     }
 
@@ -87,7 +87,7 @@ struct GetAccountIDTests {
     func rejectsBlank() async throws {
         let sut = SUT()
         await #expect(throws: ApplicationError.invalidArgument("name must not be blank")) {
-            _ = try await sut.getAccountID(name: "   ")
+            _ = try await sut.queries.getID(name: "   ")
         }
     }
 }

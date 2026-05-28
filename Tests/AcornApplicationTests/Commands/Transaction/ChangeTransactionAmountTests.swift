@@ -12,9 +12,8 @@ struct ChangeTransactionAmountTests {
         // Repos
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransaction: RecordTransaction
-        let changeTransactionAmount: ChangeTransactionAmount
+        // Commands
+        let commands: TransactionCommands
 
         let seedAccount: Account
 
@@ -27,9 +26,11 @@ struct ChangeTransactionAmountTests {
             // Repos
             self.transactions = transactions
 
-            // Services
-            self.recordTransaction = RecordTransaction(unitOfWork: uow)
-            self.changeTransactionAmount = ChangeTransactionAmount(unitOfWork: uow)
+            // Commands
+            self.commands = TransactionCommands(
+                unitOfWork: uow,
+                transfers: TransferCommands(unitOfWork: uow)
+            )
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -43,9 +44,9 @@ struct ChangeTransactionAmountTests {
     @Test("updates amount, preserving date")
     func updatesAmount() async throws {
         let sut = try await SUT()
-        let tx = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
+        let tx = try await sut.commands.record(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
 
-        try await sut.changeTransactionAmount(transactionID: tx.id, amount: 25)
+        try await sut.commands.changeAmount(transactionID: tx.id, amount: 25)
 
         let stored = try await sut.transactions.fetch(id: tx.id)
         #expect(stored?.amount == 25)
@@ -57,20 +58,20 @@ struct ChangeTransactionAmountTests {
         let sut = try await SUT()
 
         await #expect(throws: ApplicationError.self) {
-            try await sut.changeTransactionAmount(transactionID: UUID(), amount: 1)
+            try await sut.commands.changeAmount(transactionID: UUID(), amount: 1)
         }
     }
 
     @Test("fails on a deleted transaction")
     func failsOnDeleted() async throws {
         let sut = try await SUT()
-        let tx = try await sut.recordTransaction(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
+        let tx = try await sut.commands.record(accountID: sut.seedAccount.id, amount: 10, date: Self.today)
         var deletedTx = try await sut.transactions.fetch(id: tx.id)!
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.changeTransactionAmount(transactionID: tx.id, amount: 99)
+            try await sut.commands.changeAmount(transactionID: tx.id, amount: 99)
         }
     }
 
@@ -86,7 +87,7 @@ struct ChangeTransactionAmountTests {
         try await sut.transactions.save(legs.from)
 
         await #expect(throws: ApplicationError.self) {
-            try await sut.changeTransactionAmount(transactionID: legs.from.id, amount: 5)
+            try await sut.commands.changeAmount(transactionID: legs.from.id, amount: 5)
         }
     }
 }

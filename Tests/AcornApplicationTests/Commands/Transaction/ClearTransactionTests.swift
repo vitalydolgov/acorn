@@ -12,9 +12,8 @@ struct ClearTransactionTests {
         // Repos
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransaction: RecordTransaction
-        let clearTransaction: ClearTransaction
+        // Commands
+        let commands: TransactionCommands
 
         let seedAccount: Account
 
@@ -27,9 +26,11 @@ struct ClearTransactionTests {
             // Repos
             self.transactions = transactions
 
-            // Services
-            self.recordTransaction = RecordTransaction(unitOfWork: uow)
-            self.clearTransaction = ClearTransaction(unitOfWork: uow)
+            // Commands
+            self.commands = TransactionCommands(
+                unitOfWork: uow,
+                transfers: TransferCommands(unitOfWork: uow)
+            )
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -38,7 +39,7 @@ struct ClearTransactionTests {
         }
 
         func post(_ amount: Decimal = 10) async throws -> Transaction {
-            try await recordTransaction(accountID: seedAccount.id, amount: amount, date: .today())
+            try await commands.record(accountID: seedAccount.id, amount: amount, date: .today())
         }
     }
 
@@ -47,7 +48,7 @@ struct ClearTransactionTests {
         let sut = try await SUT()
         let tx = try await sut.post()
 
-        try await sut.clearTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
 
         let stored = try #require(try await sut.transactions.fetch(id: tx.id))
         #expect(stored.status == .cleared)
@@ -57,10 +58,10 @@ struct ClearTransactionTests {
     func failsWhenNotUncleared() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.clearTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
 
         await #expect(throws: DomainError.invalidState("transaction is not uncleared")) {
-            try await sut.clearTransaction(transactionID: tx.id)
+            try await sut.commands.clear(transactionID: tx.id)
         }
     }
 
@@ -68,7 +69,7 @@ struct ClearTransactionTests {
     func failsForUnknown() async throws {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.self) {
-            try await sut.clearTransaction(transactionID: UUID())
+            try await sut.commands.clear(transactionID: UUID())
         }
     }
 
@@ -81,7 +82,7 @@ struct ClearTransactionTests {
         try await sut.transactions.save(deletedTx)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.clearTransaction(transactionID: tx.id)
+            try await sut.commands.clear(transactionID: tx.id)
         }
     }
 }

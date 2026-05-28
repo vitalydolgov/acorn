@@ -3,7 +3,7 @@ import JSONSchema
 import AcornApplication
 
 extension Tool {
-    public static func listAccounts(_ command: ListAccounts) -> Tool {
+    public static func listAccounts(_ queries: AccountQueries) -> Tool {
         Tool(
             name: "list_accounts",
             description: """
@@ -15,7 +15,7 @@ extension Tool {
                 """,
             schema: .object(properties: [:], required: []),
             invoke: { _ in
-                let accounts = try await command()
+                let accounts = try await queries.list()
                 let dtos = accounts.map(AccountDTO.init(from:))
                 let data = try JSONEncoder().encode(dtos)
                 return try JSONDecoder().decode(JSONValue.self, from: data)

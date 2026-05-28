@@ -13,10 +13,8 @@ struct ReopenAccountTests {
         // Repos
         let accounts: InMemoryAccountRepository
 
-        // Services
-        let addAccount: AddAccount
-        let closeAccount: CloseAccount
-        let reopenAccount: ReopenAccount
+        // Commands
+        let commands: AccountCommands
 
         init() {
             let accounts = InMemoryAccountRepository()
@@ -31,13 +29,8 @@ struct ReopenAccountTests {
             // Repos
             self.accounts = accounts
 
-            // Services
-            self.addAccount = AddAccount(unitOfWork: uow)
-            self.closeAccount = CloseAccount(
-                unitOfWork: uow,
-                todayProvider: todayProvider
-            )
-            self.reopenAccount = ReopenAccount(unitOfWork: uow)
+            // Commands
+            self.commands = AccountCommands(unitOfWork: uow, todayProvider: todayProvider)
         }
 
         var today: AcornDate { todayProvider.today() }
@@ -46,10 +39,10 @@ struct ReopenAccountTests {
     @Test("flips closed to open")
     func flipsClosedToOpen() async throws {
         let sut = SUT()
-        let account = try await sut.addAccount(name: "A")
-        try await sut.closeAccount(accountID: account.id)
+        let account = try await sut.commands.add(name: "A")
+        try await sut.commands.close(accountID: account.id)
 
-        try await sut.reopenAccount(accountID: account.id)
+        try await sut.commands.reopen(accountID: account.id)
 
         let stored = try #require(try await sut.accounts.fetch(id: account.id))
         #expect(stored.isClosed == false)
@@ -59,32 +52,32 @@ struct ReopenAccountTests {
     func failsForUnknown() async throws {
         let sut = SUT()
         await #expect(throws: ApplicationError.self) {
-            try await sut.reopenAccount(accountID: UUID())
+            try await sut.commands.reopen(accountID: UUID())
         }
     }
 
     @Test("fails when not closed")
     func failsWhenNotClosed() async throws {
         let sut = SUT()
-        let account = try await sut.addAccount(name: "A")
+        let account = try await sut.commands.add(name: "A")
 
         await #expect(throws: DomainError.invalidState("account is not closed")) {
-            try await sut.reopenAccount(accountID: account.id)
+            try await sut.commands.reopen(accountID: account.id)
         }
     }
 
     @Test("fails on a deleted account")
     func failsOnDeleted() async throws {
         let sut = SUT()
-        let account = try await sut.addAccount(name: "A")
-        try await sut.closeAccount(accountID: account.id)
+        let account = try await sut.commands.add(name: "A")
+        try await sut.commands.close(accountID: account.id)
         let closed = try #require(try await sut.accounts.fetch(id: account.id))
         var deleted = closed
         try deleted.delete()
         try await sut.accounts.save(deleted)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.reopenAccount(accountID: account.id)
+            try await sut.commands.reopen(accountID: account.id)
         }
     }
 }

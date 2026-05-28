@@ -8,6 +8,9 @@ import AcornInMemory
 @Suite("AccountTools")
 struct AccountToolsTests {
     private func makeUoW() -> InMemoryUnitOfWork { InMemoryUnitOfWork() }
+    private func makeCommands(_ uow: InMemoryUnitOfWork) -> AccountCommands {
+        AccountCommands(unitOfWork: uow, todayProvider: SystemTodayProvider())
+    }
 
     @Test("list_accounts returns the registered accounts")
     func listAccounts() async throws {
@@ -16,7 +19,7 @@ struct AccountToolsTests {
         try await uow.accounts.save(try Account.make(name: "Savings", notes: ""))
 
         let catalog = ToolCatalog()
-        await catalog.register(.listAccounts(ListAccounts(unitOfWork: uow)))
+        await catalog.register(.listAccounts(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(name: "list_accounts", args: .object([:]))
 
@@ -34,7 +37,7 @@ struct AccountToolsTests {
         try await uow.accounts.save(checking)
 
         let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
+        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "get_account_id",
@@ -52,7 +55,7 @@ struct AccountToolsTests {
         try await uow.accounts.save(try Account.make(name: "Shared", notes: ""))
 
         let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
+        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "get_account_id",
@@ -68,7 +71,7 @@ struct AccountToolsTests {
     func getAccountIDNotFound() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
+        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "get_account_id",
@@ -92,7 +95,7 @@ struct AccountToolsTests {
         )
 
         let catalog = ToolCatalog()
-        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "calculate_balance",
@@ -111,7 +114,7 @@ struct AccountToolsTests {
     func calculateBalanceMissingArg() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(name: "calculate_balance", args: .object([:]))
 
@@ -122,7 +125,7 @@ struct AccountToolsTests {
     func calculateBalanceInvalidUUID() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "calculate_balance",
@@ -136,7 +139,7 @@ struct AccountToolsTests {
     func addAccount() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.addAccount(AddAccount(unitOfWork: uow)))
+        await catalog.register(.addAccount(makeCommands(uow)))
 
         let outcome = await catalog.dispatch(
             name: "add_account",
@@ -156,7 +159,7 @@ struct AccountToolsTests {
     func addAccountBlankName() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.addAccount(AddAccount(unitOfWork: uow)))
+        await catalog.register(.addAccount(makeCommands(uow)))
 
         let outcome = await catalog.dispatch(
             name: "add_account",
@@ -173,9 +176,7 @@ struct AccountToolsTests {
         try await uow.accounts.save(account)
 
         let catalog = ToolCatalog()
-        await catalog.register(
-            .closeAccount(CloseAccount(unitOfWork: uow, todayProvider: SystemTodayProvider()))
-        )
+        await catalog.register(.closeAccount(makeCommands(uow)))
 
         let outcome = await catalog.dispatch(
             name: "close_account",
@@ -191,13 +192,12 @@ struct AccountToolsTests {
     @Test("reopen_account reopens a closed account")
     func reopenAccount() async throws {
         let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
-        try await CloseAccount(unitOfWork: uow, todayProvider: SystemTodayProvider())(
-            accountID: account.id
-        )
+        let commands = makeCommands(uow)
+        let account = try await commands.add(name: "Checking")
+        try await commands.close(accountID: account.id)
 
         let catalog = ToolCatalog()
-        await catalog.register(.reopenAccount(ReopenAccount(unitOfWork: uow)))
+        await catalog.register(.reopenAccount(commands))
 
         let outcome = await catalog.dispatch(
             name: "reopen_account",
@@ -212,10 +212,11 @@ struct AccountToolsTests {
     @Test("change_account_name renames the account")
     func changeAccountName() async throws {
         let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Old", notes: "keep me")
+        let commands = makeCommands(uow)
+        let account = try await commands.add(name: "Old", notes: "keep me")
 
         let catalog = ToolCatalog()
-        await catalog.register(.changeAccountName(ChangeAccountName(unitOfWork: uow)))
+        await catalog.register(.changeAccountName(commands))
 
         let outcome = await catalog.dispatch(
             name: "change_account_name",
@@ -234,10 +235,11 @@ struct AccountToolsTests {
     @Test("update_account_metadata updates the notes")
     func updateAccountMetadata() async throws {
         let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Salary", notes: "old")
+        let commands = makeCommands(uow)
+        let account = try await commands.add(name: "Salary", notes: "old")
 
         let catalog = ToolCatalog()
-        await catalog.register(.updateAccountMetadata(UpdateAccountMetadata(unitOfWork: uow)))
+        await catalog.register(.updateAccountMetadata(commands))
 
         let outcome = await catalog.dispatch(
             name: "update_account_metadata",
@@ -256,10 +258,11 @@ struct AccountToolsTests {
     @Test("delete_account removes an account with no activity")
     func deleteAccount() async throws {
         let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
+        let commands = makeCommands(uow)
+        let account = try await commands.add(name: "Checking")
 
         let catalog = ToolCatalog()
-        await catalog.register(.deleteAccount(DeleteAccount(unitOfWork: uow)))
+        await catalog.register(.deleteAccount(commands))
 
         let outcome = await catalog.dispatch(
             name: "delete_account",
@@ -274,13 +277,14 @@ struct AccountToolsTests {
     @Test("delete_account surfaces a failure when the account has activity")
     func deleteAccountWithActivityFails() async throws {
         let uow = makeUoW()
-        let account = try await AddAccount(unitOfWork: uow)(name: "Checking")
+        let commands = makeCommands(uow)
+        let account = try await commands.add(name: "Checking")
         try await uow.transactions.save(
             Transaction.add(accountID: account.id, amount: 10, date: .today())
         )
 
         let catalog = ToolCatalog()
-        await catalog.register(.deleteAccount(DeleteAccount(unitOfWork: uow)))
+        await catalog.register(.deleteAccount(commands))
 
         let outcome = await catalog.dispatch(
             name: "delete_account",
@@ -300,7 +304,7 @@ struct AccountToolsTests {
         )
 
         let catalog = ToolCatalog()
-        await catalog.register(.listAccounts(ListAccounts(unitOfWork: uow)))
+        await catalog.register(.listAccounts(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(name: "list_accounts", args: .object([:]))
 
@@ -317,7 +321,7 @@ struct AccountToolsTests {
         try await uow.accounts.save(account)
 
         let catalog = ToolCatalog()
-        await catalog.register(.getAccount(GetAccount(unitOfWork: uow)))
+        await catalog.register(.getAccount(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "get_account",
@@ -335,7 +339,7 @@ struct AccountToolsTests {
     func getAccountNotFound() async throws {
         let uow = makeUoW()
         let catalog = ToolCatalog()
-        await catalog.register(.getAccount(GetAccount(unitOfWork: uow)))
+        await catalog.register(.getAccount(AccountQueries(unitOfWork: uow)))
 
         let outcome = await catalog.dispatch(
             name: "get_account",

@@ -8,7 +8,7 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func reopenAccount(_ command: ReopenAccount) -> Tool {
+    public static func reopenAccount(_ commands: AccountCommands) -> Tool {
         Tool(
             name: "reopen_account",
             description: """
@@ -27,7 +27,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                try await command(accountID: input.accountID)
+                try await commands.reopen(accountID: input.accountID)
                 return .object(["ok": .bool(true)])
             }
         )

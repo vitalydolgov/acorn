@@ -39,7 +39,7 @@ struct LiveAccountToolsTests {
         try await uow.accounts.save(try Account.make(name: "Savings", notes: ""))
 
         let catalog = ToolCatalog()
-        await catalog.register(.listAccounts(ListAccounts(unitOfWork: uow)))
+        await catalog.register(.listAccounts(AccountQueries(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         _ = try await session.send("What accounts do I have?")
@@ -57,8 +57,8 @@ struct LiveAccountToolsTests {
         )
 
         let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.calculateBalance(CalculateBalance(unitOfWork: uow)))
+        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
+        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
 
         let session = try session(catalog: catalog)
         let reply = try await session.send("What's the balance of my Checking account?")
@@ -80,8 +80,8 @@ struct LiveAccountToolsTests {
         try await uow.accounts.save(checking)
 
         let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(GetAccountID(unitOfWork: uow)))
-        await catalog.register(.changeAccountName(ChangeAccountName(unitOfWork: uow)))
+        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
+        await catalog.register(.changeAccountName(AccountCommands(unitOfWork: uow, todayProvider: SystemTodayProvider())))
 
         let session = try session(catalog: catalog)
         _ = try await session.send("Rename my Checking account to Everyday.")

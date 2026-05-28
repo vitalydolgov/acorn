@@ -17,10 +17,10 @@ public protocol UnitOfWork: Sendable {
     ) async throws -> T
 }
 
-/// Wraps the annotated function's body in `try await unitOfWork.perform { ctx in … }`,
+/// Wraps the annotated method's body in `try await unitOfWork.perform { ctx in … }`,
 /// so the body runs inside a single unit-of-work scope with `ctx: RepositoryContext` in scope.
 ///
-/// The enclosing type must expose a property named `unitOfWork` of type `any UnitOfWork`.
+/// The enclosing type must expose a `unitOfWork` property of type `any UnitOfWork`.
 /// Inside the body, access repositories via `ctx.accounts`, `ctx.transactions`, etc.
 @attached(body)
 public macro UnitOfWork() = #externalMacro(module: "AcornMacros", type: "UnitOfWorkMacro")

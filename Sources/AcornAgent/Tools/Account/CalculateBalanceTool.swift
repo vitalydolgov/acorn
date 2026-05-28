@@ -8,7 +8,7 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func calculateBalance(_ command: CalculateBalance) -> Tool {
+    public static func calculateBalance(_ queries: AccountQueries) -> Tool {
         Tool(
             name: "calculate_balance",
             description: """
@@ -31,7 +31,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                let balances = try await command(accountID: input.accountID)
+                let balances = try await queries.calculateBalance(accountID: input.accountID)
                 return .object([
                     "cleared_balance": .string(NSDecimalNumber(decimal: balances.cleared).stringValue),
                     "uncleared_balance": .string(NSDecimalNumber(decimal: balances.uncleared).stringValue),

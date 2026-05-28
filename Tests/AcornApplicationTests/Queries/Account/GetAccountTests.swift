@@ -8,13 +8,13 @@ import AcornDomain
 struct GetAccountTests {
     private struct SUT {
         let accounts: InMemoryAccountRepository
-        let getAccount: GetAccount
+        let queries: AccountQueries
 
         init() {
             let accounts = InMemoryAccountRepository()
             let uow = InMemoryUnitOfWork(accounts: accounts)
             self.accounts = accounts
-            self.getAccount = GetAccount(unitOfWork: uow)
+            self.queries = AccountQueries(unitOfWork: uow)
         }
     }
 
@@ -24,7 +24,7 @@ struct GetAccountTests {
         let account = try Account.make(name: "Checking", notes: "salary only; no transfers out")
         try await sut.accounts.save(account)
 
-        let found = try await sut.getAccount(accountID: account.id)
+        let found = try await sut.queries.get(accountID: account.id)
         #expect(found.id == account.id)
         #expect(found.name == "Checking")
         #expect(found.notes == "salary only; no transfers out")
@@ -34,7 +34,7 @@ struct GetAccountTests {
     func notFound() async throws {
         let sut = SUT()
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.getAccount(accountID: UUID())
+            _ = try await sut.queries.get(accountID: UUID())
         }
     }
 
@@ -48,7 +48,7 @@ struct GetAccountTests {
         try await sut.accounts.save(stored)
 
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.getAccount(accountID: account.id)
+            _ = try await sut.queries.get(accountID: account.id)
         }
     }
 }

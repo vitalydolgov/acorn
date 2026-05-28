@@ -12,9 +12,8 @@ struct DeleteTransferTests {
         // Repos
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransfer: RecordTransfer
-        let deleteTransfer: DeleteTransfer
+        // Commands
+        let commands: TransferCommands
 
         let seedFrom: Account
         let seedTo: Account
@@ -28,9 +27,8 @@ struct DeleteTransferTests {
             // Repos
             self.transactions = transactions
 
-            // Services
-            self.recordTransfer = RecordTransfer(unitOfWork: uow)
-            self.deleteTransfer = DeleteTransfer(unitOfWork: uow)
+            // Commands
+            self.commands = TransferCommands(unitOfWork: uow)
 
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")
@@ -43,7 +41,7 @@ struct DeleteTransferTests {
         }
 
         func make() async throws -> (from: Transaction, to: Transaction) {
-            try await recordTransfer(
+            try await commands.record(
                 fromAccountID: seedFrom.id,
                 toAccountID: seedTo.id,
                 amount: 50,
@@ -58,7 +56,7 @@ struct DeleteTransferTests {
         let legs = try await sut.make()
         let transferID = try #require(legs.from.transferID)
 
-        try await sut.deleteTransfer(transferID: transferID)
+        try await sut.commands.delete(transferID: transferID)
 
         let from = try #require(try await sut.transactions.fetch(id: legs.from.id))
         let to = try #require(try await sut.transactions.fetch(id: legs.to.id))
@@ -71,10 +69,10 @@ struct DeleteTransferTests {
         let sut = try await SUT()
         let legs = try await sut.make()
         let transferID = try #require(legs.from.transferID)
-        try await sut.deleteTransfer(transferID: transferID)
+        try await sut.commands.delete(transferID: transferID)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.deleteTransfer(transferID: transferID)
+            try await sut.commands.delete(transferID: transferID)
         }
     }
 
@@ -82,7 +80,7 @@ struct DeleteTransferTests {
     func failsForUnknown() async throws {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.self) {
-            try await sut.deleteTransfer(transferID: UUID())
+            try await sut.commands.delete(transferID: UUID())
         }
     }
 }

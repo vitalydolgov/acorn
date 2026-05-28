@@ -12,10 +12,8 @@ struct ReconcileTransactionTests {
         // Repos
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransaction: RecordTransaction
-        let clearTransaction: ClearTransaction
-        let reconcileTransaction: ReconcileTransaction
+        // Commands
+        let commands: TransactionCommands
 
         let seedAccount: Account
 
@@ -28,10 +26,11 @@ struct ReconcileTransactionTests {
             // Repos
             self.transactions = transactions
 
-            // Services
-            self.recordTransaction = RecordTransaction(unitOfWork: uow)
-            self.clearTransaction = ClearTransaction(unitOfWork: uow)
-            self.reconcileTransaction = ReconcileTransaction(unitOfWork: uow)
+            // Commands
+            self.commands = TransactionCommands(
+                unitOfWork: uow,
+                transfers: TransferCommands(unitOfWork: uow)
+            )
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -40,7 +39,7 @@ struct ReconcileTransactionTests {
         }
 
         func post() async throws -> Transaction {
-            try await recordTransaction(accountID: seedAccount.id, amount: 10, date: .today())
+            try await commands.record(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 
@@ -48,9 +47,9 @@ struct ReconcileTransactionTests {
     func promotesClearedToReconciled() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.clearTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
 
-        try await sut.reconcileTransaction(transactionID: tx.id)
+        try await sut.commands.reconcile(transactionID: tx.id)
 
         let stored = try #require(try await sut.transactions.fetch(id: tx.id))
         #expect(stored.status == .reconciled)
@@ -62,7 +61,7 @@ struct ReconcileTransactionTests {
         let tx = try await sut.post()
 
         await #expect(throws: DomainError.invalidState("transaction is not cleared")) {
-            try await sut.reconcileTransaction(transactionID: tx.id)
+            try await sut.commands.reconcile(transactionID: tx.id)
         }
     }
 
@@ -70,7 +69,7 @@ struct ReconcileTransactionTests {
     func failsForUnknown() async throws {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.self) {
-            try await sut.reconcileTransaction(transactionID: UUID())
+            try await sut.commands.reconcile(transactionID: UUID())
         }
     }
 
@@ -78,14 +77,14 @@ struct ReconcileTransactionTests {
     func failsOnDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.clearTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
         let cleared = try #require(try await sut.transactions.fetch(id: tx.id))
         var deletedTx = cleared
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.reconcileTransaction(transactionID: tx.id)
+            try await sut.commands.reconcile(transactionID: tx.id)
         }
     }
 }

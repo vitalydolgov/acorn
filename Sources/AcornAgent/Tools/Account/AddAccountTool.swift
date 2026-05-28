@@ -8,7 +8,7 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func addAccount(_ command: AddAccount) -> Tool {
+    public static func addAccount(_ commands: AccountCommands) -> Tool {
         Tool(
             name: "add_account",
             description: """
@@ -26,7 +26,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                let account = try await command(name: input.name, notes: input.notes ?? "")
+                let account = try await commands.add(name: input.name, notes: input.notes ?? "")
                 let json = try JSONEncoder().encode(AccountDTO(from: account))
                 return try JSONDecoder().decode(JSONValue.self, from: json)
             }

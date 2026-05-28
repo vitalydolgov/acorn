@@ -12,11 +12,8 @@ struct UnclearTransactionTests {
         // Repos
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransaction: RecordTransaction
-        let clearTransaction: ClearTransaction
-        let reconcileTransaction: ReconcileTransaction
-        let unclearTransaction: UnclearTransaction
+        // Commands
+        let commands: TransactionCommands
 
         let seedAccount: Account
 
@@ -29,11 +26,11 @@ struct UnclearTransactionTests {
             // Repos
             self.transactions = transactions
 
-            // Services
-            self.recordTransaction = RecordTransaction(unitOfWork: uow)
-            self.clearTransaction = ClearTransaction(unitOfWork: uow)
-            self.reconcileTransaction = ReconcileTransaction(unitOfWork: uow)
-            self.unclearTransaction = UnclearTransaction(unitOfWork: uow)
+            // Commands
+            self.commands = TransactionCommands(
+                unitOfWork: uow,
+                transfers: TransferCommands(unitOfWork: uow)
+            )
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -42,7 +39,7 @@ struct UnclearTransactionTests {
         }
 
         func post() async throws -> Transaction {
-            try await recordTransaction(accountID: seedAccount.id, amount: 10, date: .today())
+            try await commands.record(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 
@@ -50,9 +47,9 @@ struct UnclearTransactionTests {
     func flipsClearedToUncleared() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.clearTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
 
-        try await sut.unclearTransaction(transactionID: tx.id)
+        try await sut.commands.unclear(transactionID: tx.id)
 
         let stored = try #require(try await sut.transactions.fetch(id: tx.id))
         #expect(stored.status == .uncleared)
@@ -64,7 +61,7 @@ struct UnclearTransactionTests {
         let tx = try await sut.post()
 
         await #expect(throws: DomainError.invalidState("transaction is not cleared")) {
-            try await sut.unclearTransaction(transactionID: tx.id)
+            try await sut.commands.unclear(transactionID: tx.id)
         }
     }
 
@@ -72,11 +69,11 @@ struct UnclearTransactionTests {
     func failsOnReconciled() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.clearTransaction(transactionID: tx.id)
-        try await sut.reconcileTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
+        try await sut.commands.reconcile(transactionID: tx.id)
 
         await #expect(throws: DomainError.invalidState("transaction is not cleared")) {
-            try await sut.unclearTransaction(transactionID: tx.id)
+            try await sut.commands.unclear(transactionID: tx.id)
         }
     }
 
@@ -84,7 +81,7 @@ struct UnclearTransactionTests {
     func failsForUnknown() async throws {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.self) {
-            try await sut.unclearTransaction(transactionID: UUID())
+            try await sut.commands.unclear(transactionID: UUID())
         }
     }
 
@@ -92,14 +89,14 @@ struct UnclearTransactionTests {
     func failsOnDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.clearTransaction(transactionID: tx.id)
+        try await sut.commands.clear(transactionID: tx.id)
         let cleared = try #require(try await sut.transactions.fetch(id: tx.id))
         var deletedTx = cleared
         try deletedTx.delete()
         try await sut.transactions.save(deletedTx)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.unclearTransaction(transactionID: tx.id)
+            try await sut.commands.unclear(transactionID: tx.id)
         }
     }
 }

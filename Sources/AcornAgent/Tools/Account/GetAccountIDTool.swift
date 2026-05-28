@@ -5,7 +5,7 @@ import AcornApplication
 private struct Input: Decodable { let name: String }
 
 extension Tool {
-    public static func getAccountID(_ command: GetAccountID) -> Tool {
+    public static func getAccountID(_ queries: AccountQueries) -> Tool {
         Tool(
             name: "get_account_id",
             description: """
@@ -23,7 +23,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                let result = try await command(name: input.name)
+                let result = try await queries.getID(name: input.name)
                 switch result {
                 case .found(let id):
                     return .object(["id": .string(id.uuidString)])

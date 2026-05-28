@@ -8,7 +8,7 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func closeAccount(_ command: CloseAccount) -> Tool {
+    public static func closeAccount(_ commands: AccountCommands) -> Tool {
         Tool(
             name: "close_account",
             description: """
@@ -28,7 +28,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                try await command(accountID: input.accountID)
+                try await commands.close(accountID: input.accountID)
                 return .object(["ok": .bool(true)])
             }
         )

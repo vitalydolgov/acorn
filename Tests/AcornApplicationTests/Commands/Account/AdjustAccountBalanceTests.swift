@@ -13,8 +13,8 @@ struct AdjustAccountBalanceTests {
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let adjustAccountBalance: AdjustAccountBalance
+        // Commands
+        let commands: AccountCommands
 
         let seedAccount: Account
 
@@ -28,8 +28,8 @@ struct AdjustAccountBalanceTests {
             self.accounts = accounts
             self.transactions = transactions
 
-            // Services
-            self.adjustAccountBalance = AdjustAccountBalance(
+            // Commands
+            self.commands = AccountCommands(
                 unitOfWork: uow,
                 todayProvider: FixedTodayProvider(date: .today())
             )
@@ -45,7 +45,7 @@ struct AdjustAccountBalanceTests {
     func createsAdjustment() async throws {
         let sut = try await SUT()
 
-        let tx = try await sut.adjustAccountBalance(accountID: sut.seedAccount.id, amount: -7)
+        let tx = try await sut.commands.adjustBalance(accountID: sut.seedAccount.id, amount: -7)
 
         #expect(tx.amount == -7)
         #expect(tx.kind == .adjustment)
@@ -55,7 +55,7 @@ struct AdjustAccountBalanceTests {
     func zeroAmountFails() async throws {
         let sut = try await SUT()
         await #expect(throws: DomainError.invalidArgument("amount must be non-zero")) {
-            _ = try await sut.adjustAccountBalance(accountID: sut.seedAccount.id, amount: 0)
+            _ = try await sut.commands.adjustBalance(accountID: sut.seedAccount.id, amount: 0)
         }
     }
 
@@ -67,7 +67,7 @@ struct AdjustAccountBalanceTests {
         try await sut.accounts.save(closed)
 
         await #expect(throws: DomainError.invalidState("account is closed")) {
-            _ = try await sut.adjustAccountBalance(accountID: sut.seedAccount.id, amount: 10)
+            _ = try await sut.commands.adjustBalance(accountID: sut.seedAccount.id, amount: 10)
         }
     }
 }

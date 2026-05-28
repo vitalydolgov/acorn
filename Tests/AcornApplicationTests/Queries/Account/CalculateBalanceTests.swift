@@ -9,9 +9,9 @@ struct CalculateBalanceTests {
     private struct SUT {
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
-        let calculateBalance: CalculateBalance
-        let recordTransfer: RecordTransfer
-        let clearTransaction: ClearTransaction
+        let queries: AccountQueries
+        let transferCommands: TransferCommands
+        let transactionCommands: TransactionCommands
 
         init() {
             let accounts = InMemoryAccountRepository()
@@ -19,9 +19,9 @@ struct CalculateBalanceTests {
             let uow = InMemoryUnitOfWork(accounts: accounts, transactions: transactions)
             self.accounts = accounts
             self.transactions = transactions
-            self.calculateBalance = CalculateBalance(unitOfWork: uow)
-            self.recordTransfer = RecordTransfer(unitOfWork: uow)
-            self.clearTransaction = ClearTransaction(unitOfWork: uow)
+            self.queries = AccountQueries(unitOfWork: uow)
+            self.transferCommands = TransferCommands(unitOfWork: uow)
+            self.transactionCommands = TransactionCommands(unitOfWork: uow, transfers: transferCommands)
         }
     }
 
@@ -31,8 +31,8 @@ struct CalculateBalanceTests {
         let account = try Account.make(name: "Checking", notes: "")
         try await sut.accounts.save(account)
 
-        let balances = try await sut.calculateBalance(accountID: account.id)
-        #expect(balances == CalculateBalance.Balances(cleared: 0, uncleared: 0, working: 0))
+        let balances = try await sut.queries.calculateBalance(accountID: account.id)
+        #expect(balances == AccountQueries.Balances(cleared: 0, uncleared: 0, working: 0))
     }
 
     @Test("splits cleared and uncleared transactions and sums the working balance")
@@ -48,7 +48,7 @@ struct CalculateBalanceTests {
             Transaction.add(accountID: account.id, amount: -30, date: .today())
         )
 
-        let balances = try await sut.calculateBalance(accountID: account.id)
+        let balances = try await sut.queries.calculateBalance(accountID: account.id)
         #expect(balances.cleared == 100)
         #expect(balances.uncleared == -30)
         #expect(balances.working == 70)
@@ -61,20 +61,20 @@ struct CalculateBalanceTests {
         let savings = try Account.make(name: "Savings", notes: "")
         try await sut.accounts.save(checking)
         try await sut.accounts.save(savings)
-        let legs = try await sut.recordTransfer(
+        let legs = try await sut.transferCommands.record(
             fromAccountID: checking.id,
             toAccountID: savings.id,
             amount: 50,
             date: .today()
         )
-        try await sut.clearTransaction(transactionID: legs.from.id)
+        try await sut.transactionCommands.clear(transactionID: legs.from.id)
 
-        let checkingBalances = try await sut.calculateBalance(accountID: checking.id)
+        let checkingBalances = try await sut.queries.calculateBalance(accountID: checking.id)
         #expect(checkingBalances.cleared == -50)
         #expect(checkingBalances.uncleared == 0)
         #expect(checkingBalances.working == -50)
 
-        let savingsBalances = try await sut.calculateBalance(accountID: savings.id)
+        let savingsBalances = try await sut.queries.calculateBalance(accountID: savings.id)
         #expect(savingsBalances.cleared == 0)
         #expect(savingsBalances.uncleared == 50)
         #expect(savingsBalances.working == 50)
@@ -84,7 +84,7 @@ struct CalculateBalanceTests {
     func notFound() async throws {
         let sut = SUT()
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.calculateBalance(accountID: UUID())
+            _ = try await sut.queries.calculateBalance(accountID: UUID())
         }
     }
 }

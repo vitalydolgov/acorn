@@ -12,7 +12,7 @@ private struct Input: Decodable {
 }
 
 extension Tool {
-    public static func changeAccountName(_ command: ChangeAccountName) -> Tool {
+    public static func changeAccountName(_ commands: AccountCommands) -> Tool {
         Tool(
             name: "change_account_name",
             description: """
@@ -31,7 +31,7 @@ extension Tool {
             invoke: { args in
                 let data = try JSONEncoder().encode(args)
                 let input = try JSONDecoder().decode(Input.self, from: data)
-                try await command(accountID: input.accountID, name: input.name)
+                try await commands.changeName(accountID: input.accountID, name: input.name)
                 return .object(["ok": .bool(true)])
             }
         )

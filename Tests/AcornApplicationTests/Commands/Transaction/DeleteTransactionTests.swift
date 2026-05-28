@@ -12,9 +12,8 @@ struct DeleteTransactionTests {
         // Repos
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransaction: RecordTransaction
-        let deleteTransaction: DeleteTransaction
+        // Commands
+        let commands: TransactionCommands
 
         let seedAccount: Account
 
@@ -27,9 +26,11 @@ struct DeleteTransactionTests {
             // Repos
             self.transactions = transactions
 
-            // Services
-            self.recordTransaction = RecordTransaction(unitOfWork: uow)
-            self.deleteTransaction = DeleteTransaction(unitOfWork: uow)
+            // Commands
+            self.commands = TransactionCommands(
+                unitOfWork: uow,
+                transfers: TransferCommands(unitOfWork: uow)
+            )
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)
@@ -38,7 +39,7 @@ struct DeleteTransactionTests {
         }
 
         func post() async throws -> Transaction {
-            try await recordTransaction(accountID: seedAccount.id, amount: 10, date: .today())
+            try await commands.record(accountID: seedAccount.id, amount: 10, date: .today())
         }
     }
 
@@ -47,7 +48,7 @@ struct DeleteTransactionTests {
         let sut = try await SUT()
         let tx = try await sut.post()
 
-        try await sut.deleteTransaction(transactionID: tx.id)
+        try await sut.commands.delete(transactionID: tx.id)
 
         let stored = try #require(try await sut.transactions.fetch(id: tx.id))
         #expect(stored.isDeleted == true)
@@ -57,10 +58,10 @@ struct DeleteTransactionTests {
     func failsWhenAlreadyDeleted() async throws {
         let sut = try await SUT()
         let tx = try await sut.post()
-        try await sut.deleteTransaction(transactionID: tx.id)
+        try await sut.commands.delete(transactionID: tx.id)
 
         await #expect(throws: DomainError.deleted) {
-            try await sut.deleteTransaction(transactionID: tx.id)
+            try await sut.commands.delete(transactionID: tx.id)
         }
     }
 
@@ -76,7 +77,7 @@ struct DeleteTransactionTests {
         try await sut.transactions.save(legs.from)
 
         await #expect(throws: ApplicationError.self) {
-            try await sut.deleteTransaction(transactionID: legs.from.id)
+            try await sut.commands.delete(transactionID: legs.from.id)
         }
     }
 }

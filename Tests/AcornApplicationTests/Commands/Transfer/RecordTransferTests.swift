@@ -13,8 +13,8 @@ struct RecordTransferTests {
         let accounts: InMemoryAccountRepository
         let transactions: InMemoryTransactionRepository
 
-        // Services
-        let recordTransfer: RecordTransfer
+        // Commands
+        let commands: TransferCommands
 
         let seedFrom: Account
         let seedTo: Account
@@ -29,8 +29,8 @@ struct RecordTransferTests {
             self.accounts = accounts
             self.transactions = transactions
 
-            // Services
-            self.recordTransfer = RecordTransfer(unitOfWork: uow)
+            // Commands
+            self.commands = TransferCommands(unitOfWork: uow)
 
             var from = try Account.make(name: "Checking", notes: "")
             var to = try Account.make(name: "Savings", notes: "")
@@ -49,7 +49,7 @@ struct RecordTransferTests {
     func storesTwoLegs() async throws {
         let sut = try await SUT()
 
-        let legs = try await sut.recordTransfer(
+        let legs = try await sut.commands.record(
             fromAccountID: sut.seedFrom.id,
             toAccountID: sut.seedTo.id,
             amount: 100,
@@ -91,7 +91,7 @@ struct RecordTransferTests {
     func failsForUnknownFrom() async throws {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.recordTransfer(
+            _ = try await sut.commands.record(
                 fromAccountID: UUID(),
                 toAccountID: sut.seedTo.id,
                 amount: 10,
@@ -104,7 +104,7 @@ struct RecordTransferTests {
     func failsForUnknownTo() async throws {
         let sut = try await SUT()
         await #expect(throws: ApplicationError.self) {
-            _ = try await sut.recordTransfer(
+            _ = try await sut.commands.record(
                 fromAccountID: sut.seedFrom.id,
                 toAccountID: UUID(),
                 amount: 10,
@@ -121,7 +121,7 @@ struct RecordTransferTests {
         try await sut.accounts.save(closed)
 
         await #expect(throws: DomainError.invalidState("account is closed")) {
-            _ = try await sut.recordTransfer(
+            _ = try await sut.commands.record(
                 fromAccountID: sut.seedFrom.id,
                 toAccountID: sut.seedTo.id,
                 amount: 10,
@@ -138,7 +138,7 @@ struct RecordTransferTests {
         try await sut.accounts.save(deleted)
 
         await #expect(throws: DomainError.deleted) {
-            _ = try await sut.recordTransfer(
+            _ = try await sut.commands.record(
                 fromAccountID: sut.seedFrom.id,
                 toAccountID: sut.seedTo.id,
                 amount: 10,
@@ -151,7 +151,7 @@ struct RecordTransferTests {
     func failsForSameAccount() async throws {
         let sut = try await SUT()
         await #expect(throws: DomainError.invalidArgument("source and destination must differ")) {
-            _ = try await sut.recordTransfer(
+            _ = try await sut.commands.record(
                 fromAccountID: sut.seedFrom.id,
                 toAccountID: sut.seedFrom.id,
                 amount: 10,
@@ -164,7 +164,7 @@ struct RecordTransferTests {
     func failsForNonPositive() async throws {
         let sut = try await SUT()
         await #expect(throws: DomainError.invalidArgument("amount must be positive")) {
-            _ = try await sut.recordTransfer(
+            _ = try await sut.commands.record(
                 fromAccountID: sut.seedFrom.id,
                 toAccountID: sut.seedTo.id,
                 amount: 0,
