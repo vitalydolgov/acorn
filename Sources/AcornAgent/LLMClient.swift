@@ -10,14 +10,14 @@ public struct ChatRequest: Encodable, Sendable {
     public let maxTokens: Int
     public let system: [SystemBlock]?
     public let tools: [ToolDescriptor]
-    public let messages: [Message]
+    public let messages: [ChatMessage]
 
     public init(
         model: String,
         maxTokens: Int,
         system: [SystemBlock]? = nil,
         tools: [ToolDescriptor] = [],
-        messages: [Message]
+        messages: [ChatMessage]
     ) {
         self.model = model
         self.maxTokens = maxTokens
@@ -52,38 +52,38 @@ public struct SystemBlock: Codable, Sendable {
 public struct CacheControl: Codable, Sendable {
     public let type: String
 
-    public init(type: String = "ephemeral") {
+    public init(type: String) {
         self.type = type
     }
 
     public static let ephemeral = CacheControl(type: "ephemeral")
 }
 
-public struct Message: Codable, Sendable {
-    public let role: Role
+public struct ChatMessage: Codable, Sendable {
+    public let role: ChatRole
     public let content: [ContentBlock]
 
-    public init(role: Role, content: [ContentBlock]) {
+    public init(role: ChatRole, content: [ContentBlock]) {
         self.role = role
         self.content = content
     }
 }
 
-public enum Role: String, Codable, Sendable {
+public enum ChatRole: String, Codable, Sendable {
     case user
     case assistant
 }
 
 public struct ChatResponse: Decodable, Sendable {
     public let id: String
-    public let role: Role
+    public let role: ChatRole
     public let content: [ContentBlock]
     public let stopReason: String?
     public let usage: Usage
 
     public init(
         id: String,
-        role: Role,
+        role: ChatRole,
         content: [ContentBlock],
         stopReason: String?,
         usage: Usage
