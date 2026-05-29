@@ -29,10 +29,7 @@ struct RecordTransactionTests {
             self.transactions = transactions
 
             // Commands
-            self.commands = TransactionCommands(
-                unitOfWork: uow,
-                transfers: TransferCommands(unitOfWork: uow)
-            )
+            self.commands = TransactionCommands(unitOfWork: uow)
 
             var account = try Account.make(name: "Checking", notes: "")
             try await accounts.save(account)

@@ -21,7 +21,7 @@ struct CalculateBalanceTests {
             self.transactions = transactions
             self.queries = AccountQueries(unitOfWork: uow)
             self.transferCommands = TransferCommands(unitOfWork: uow)
-            self.transactionCommands = TransactionCommands(unitOfWork: uow, transfers: transferCommands)
+            self.transactionCommands = TransactionCommands(unitOfWork: uow)
         }
     }
 

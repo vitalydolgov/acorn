@@ -4,11 +4,9 @@ import AcornDomain
 /// State-changing operations on the Transaction aggregate.
 public struct TransactionCommands: Sendable {
     private let unitOfWork: any UnitOfWork
-    private let transfers: TransferCommands
 
-    public init(unitOfWork: any UnitOfWork, transfers: TransferCommands) {
+    public init(unitOfWork: any UnitOfWork) {
         self.unitOfWork = unitOfWork
-        self.transfers = transfers
     }
 
     /// Change a transaction's amount. Rejects transfer legs.
@@ -124,24 +122,38 @@ public struct TransactionCommands: Sendable {
 
     /// Record a transaction or transfer from a unified details value, dispatching on whether a
     /// counterpart account is present.
+    @UnitOfWork
     public func recordDetails(accountID: UUID, details: TransactionDetails) async throws {
-        if let counterpartID = details.counterpartAccountID {
-            let e = details.transferEndpoints(contextAccountID: accountID, counterpartID: counterpartID)
-            _ = try await transfers.record(
-                fromAccountID: e.from,
-                toAccountID: e.to,
-                amount: details.magnitude,
-                date: details.date,
-                clearedAccountID: details.cleared ? accountID : nil
-            )
-        } else {
-            _ = try await record(
+        guard let counterpartID = details.counterpartAccountID else {
+            guard let account = try await ctx.accounts.fetch(id: accountID) else {
+                throw ApplicationError.notFound(accountID)
+            }
+            try account.assertPostable()
+            let transaction = Transaction.add(
                 accountID: accountID,
                 amount: details.amount,
                 date: details.date,
                 cleared: details.cleared
             )
+            try await ctx.transactions.save(transaction)
+            return
         }
+        let e = details.transferEndpoints(contextAccountID: accountID, counterpartID: counterpartID)
+        for id in [e.from, e.to] {
+            guard let account = try await ctx.accounts.fetch(id: id) else {
+                throw ApplicationError.notFound(id)
+            }
+            try account.assertPostable()
+        }
+        let legs = try Transaction.transfer(
+            fromAccountID: e.from,
+            toAccountID: e.to,
+            amount: details.magnitude,
+            date: details.date,
+            clearedAccountID: details.cleared ? accountID : nil
+        )
+        try await ctx.transactions.save(legs.from)
+        try await ctx.transactions.save(legs.to)
     }
 
     /// Revert a cleared transaction to uncleared.

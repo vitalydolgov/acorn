@@ -38,7 +38,7 @@ struct CloseAccountTests {
             // Commands
             self.accountCommands = AccountCommands(unitOfWork: uow, todayProvider: todayProvider)
             self.transferCommands = TransferCommands(unitOfWork: uow)
-            self.transactionCommands = TransactionCommands(unitOfWork: uow, transfers: transferCommands)
+            self.transactionCommands = TransactionCommands(unitOfWork: uow)
         }
 
         var today: AcornDate { todayProvider.today() }

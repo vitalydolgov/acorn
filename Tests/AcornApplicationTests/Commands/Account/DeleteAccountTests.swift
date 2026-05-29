@@ -34,7 +34,7 @@ struct DeleteAccountTests {
                 todayProvider: FixedTodayProvider(date: .today())
             )
             self.transferCommands = TransferCommands(unitOfWork: uow)
-            self.transactionCommands = TransactionCommands(unitOfWork: uow, transfers: transferCommands)
+            self.transactionCommands = TransactionCommands(unitOfWork: uow)
         }
     }
 
