@@ -35,18 +35,12 @@ public final class AgentRuntime {
         self.maxIterations = maxIterations
 
         Task {
-            let commands = AccountCommands(unitOfWork: unitOfWork, todayProvider: todayProvider)
-            let queries = AccountQueries(unitOfWork: unitOfWork)
-            await catalog.register(Tool.addAccount(commands))
-            await catalog.register(Tool.listAccounts(queries))
-            await catalog.register(Tool.getAccount(queries))
-            await catalog.register(Tool.getAccountID(queries))
-            await catalog.register(Tool.calculateBalance(queries))
-            await catalog.register(Tool.changeAccountName(commands))
-            await catalog.register(Tool.closeAccount(commands))
-            await catalog.register(Tool.deleteAccount(commands))
-            await catalog.register(Tool.reopenAccount(commands))
-            await catalog.register(Tool.updateAccountMetadata(commands))
+            let tools = AccountTools(unitOfWork: unitOfWork, todayProvider: todayProvider).all
+                + TransactionTools(unitOfWork: unitOfWork).all
+                + TransferTools(unitOfWork: unitOfWork).all
+            for tool in tools {
+                await catalog.register(tool)
+            }
         }
     }
 

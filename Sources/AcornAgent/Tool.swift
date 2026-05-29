@@ -1,5 +1,6 @@
 import Foundation
 import JSONSchema
+import AcornDomain
 
 public struct Tool: Sendable {
     public let name: String
@@ -21,6 +22,23 @@ public struct Tool: Sendable {
 
     public var descriptor: ToolDescriptor {
         ToolDescriptor(name: name, description: description, schema: schema)
+    }
+}
+
+public struct ToolDescriptor: Encodable, Sendable {
+    public let name: String
+    public let description: String
+    public let schema: JSONSchema
+
+    public init(name: String, description: String, schema: JSONSchema) {
+        self.name = name
+        self.description = description
+        self.schema = schema
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name, description
+        case schema = "input_schema"
     }
 }
 
@@ -65,4 +83,28 @@ public enum ToolResult: Sendable {
         if case .failure = self { return true }
         return false
     }
+}
+
+// MARK: - Helpers
+
+enum ToolInputError: Error {
+    case invalidDate(String)
+    case invalidDecimal(String)
+}
+
+func parseDate(_ string: String) throws -> AcornDate {
+    let parts = string.split(separator: "-").compactMap { Int($0) }
+    guard parts.count == 3,
+          let date = AcornDate(year: parts[0], month: parts[1], day: parts[2])
+    else {
+        throw ToolInputError.invalidDate(string)
+    }
+    return date
+}
+
+func parseDecimal(_ string: String) throws -> Decimal {
+    guard let value = Decimal(string: string) else {
+        throw ToolInputError.invalidDecimal(string)
+    }
+    return value
 }
