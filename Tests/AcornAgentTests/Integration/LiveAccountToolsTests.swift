@@ -6,15 +6,13 @@ import AcornInMemory
 @testable import AcornAgent
 
 @Suite("LiveAccountTools", .tags(.integration))
+@MainActor
 struct LiveAccountToolsTests {
-    private func session(catalog: ToolCatalog) throws -> ChatSession {
-        let key = try #require(
-            ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"],
-            "ANTHROPIC_API_KEY must be set"
-        )
-        return ChatSession(
-            client: AnthropicClient(apiKeyProvider: { key }),
-            catalog: catalog,
+    private func makeRuntime(_ uow: InMemoryUnitOfWork) -> AgentRuntime {
+        AgentRuntime(
+            unitOfWork: uow,
+            todayProvider: SystemTodayProvider(),
+            model: "claude-haiku-4-5",
             maxTokens: 512,
             systemPrompt: """
                 You are Acorn's chat agent. Use the provided tools to answer \
@@ -25,8 +23,16 @@ struct LiveAccountToolsTests {
         )
     }
 
-    private func toolNames(_ session: ChatSession) async -> [String] {
-        await session.transcript
+    private func send(_ text: String, runtime: AgentRuntime) async throws -> String {
+        await runtime.send(text)
+        if let error = runtime.sendError { throw error }
+        return runtime.messages
+            .last(where: { $0.role == .assistant })
+            .map { $0.content.compactMap(\.asText).joined() } ?? ""
+    }
+
+    private func toolNames(_ runtime: AgentRuntime) -> [String] {
+        runtime.messages
             .flatMap(\.content)
             .compactMap(\.asToolUse)
             .map(\.name)
@@ -38,13 +44,10 @@ struct LiveAccountToolsTests {
         try await uow.accounts.save(try Account.make(name: "Checking", notes: ""))
         try await uow.accounts.save(try Account.make(name: "Savings", notes: ""))
 
-        let catalog = ToolCatalog()
-        await catalog.register(.listAccounts(AccountQueries(unitOfWork: uow)))
+        let runtime = makeRuntime(uow)
+        _ = try await send("What accounts do I have?", runtime: runtime)
 
-        let session = try session(catalog: catalog)
-        _ = try await session.send("What accounts do I have?")
-
-        #expect(await toolNames(session).contains("list_accounts"))
+        #expect(toolNames(runtime).contains("list_accounts"))
     }
 
     @Test("real model chains get_account_id then calculate_balance", .requiresLLM)
@@ -56,14 +59,10 @@ struct LiveAccountToolsTests {
             Transaction.add(accountID: checking.id, amount: 250, date: .today())
         )
 
-        let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
-        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
+        let runtime = makeRuntime(uow)
+        let reply = try await send("What's the balance of my Checking account?", runtime: runtime)
 
-        let session = try session(catalog: catalog)
-        let reply = try await session.send("What's the balance of my Checking account?")
-
-        let names = await toolNames(session)
+        let names = toolNames(runtime)
         #expect(names.contains("get_account_id"))
         #expect(names.contains("calculate_balance"))
         if let idIdx = names.firstIndex(of: "get_account_id"),
@@ -79,14 +78,10 @@ struct LiveAccountToolsTests {
         let checking = try Account.make(name: "Checking", notes: "primary spending")
         try await uow.accounts.save(checking)
 
-        let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
-        await catalog.register(.changeAccountName(AccountCommands(unitOfWork: uow, todayProvider: SystemTodayProvider())))
+        let runtime = makeRuntime(uow)
+        _ = try await send("Rename my Checking account to Everyday.", runtime: runtime)
 
-        let session = try session(catalog: catalog)
-        _ = try await session.send("Rename my Checking account to Everyday.")
-
-        let names = await toolNames(session)
+        let names = toolNames(runtime)
         #expect(names.contains("change_account_name"))
         #expect(!names.contains("get_account"))
 
@@ -94,5 +89,4 @@ struct LiveAccountToolsTests {
         #expect(stored?.name == "Everyday")
         #expect(stored?.notes == "primary spending")
     }
-
 }

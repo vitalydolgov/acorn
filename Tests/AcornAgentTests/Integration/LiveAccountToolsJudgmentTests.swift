@@ -8,15 +8,13 @@ import AcornInMemory
 /// Live tests that assert on the model's *judgment* rather than mechanics.
 /// A failure here signals prompt/tool-description quality, not a code bug.
 @Suite("LiveAccountToolsJudgment", .tags(.integration))
+@MainActor
 struct LiveAccountToolsJudgmentTests {
-    private func session(catalog: ToolCatalog) throws -> ChatSession {
-        let key = try #require(
-            ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"],
-            "ANTHROPIC_API_KEY must be set"
-        )
-        return ChatSession(
-            client: AnthropicClient(apiKeyProvider: { key }),
-            catalog: catalog,
+    private func makeRuntime(_ uow: InMemoryUnitOfWork) -> AgentRuntime {
+        AgentRuntime(
+            unitOfWork: uow,
+            todayProvider: SystemTodayProvider(),
+            model: "claude-haiku-4-5",
             maxTokens: 512,
             systemPrompt: """
                 You are Acorn's chat agent. Use the provided tools to answer \
@@ -27,8 +25,8 @@ struct LiveAccountToolsJudgmentTests {
         )
     }
 
-    private func toolNames(_ session: ChatSession) async -> [String] {
-        await session.transcript
+    private func toolNames(_ runtime: AgentRuntime) -> [String] {
+        runtime.messages
             .flatMap(\.content)
             .compactMap(\.asToolUse)
             .map(\.name)
@@ -40,14 +38,10 @@ struct LiveAccountToolsJudgmentTests {
         try await uow.accounts.save(try Account.make(name: "Savings", notes: "joint"))
         try await uow.accounts.save(try Account.make(name: "Savings", notes: "personal"))
 
-        let catalog = ToolCatalog()
-        await catalog.register(.getAccountID(AccountQueries(unitOfWork: uow)))
-        await catalog.register(.calculateBalance(AccountQueries(unitOfWork: uow)))
+        let runtime = makeRuntime(uow)
+        await runtime.send("What's the balance of my Savings account?")
 
-        let session = try session(catalog: catalog)
-        _ = try await session.send("What's the balance of my Savings account?")
-
-        let names = await toolNames(session)
+        let names = toolNames(runtime)
         #expect(names.contains("get_account_id"))
         // Ambiguity must not be resolved into a balance lookup.
         #expect(!names.contains("calculate_balance"))
@@ -55,13 +49,13 @@ struct LiveAccountToolsJudgmentTests {
 
     @Test("real model answers without tools when none are needed", .requiresLLM)
     func noToolWhenUnnecessary() async throws {
-        let catalog = ToolCatalog()
-        await catalog.register(.listAccounts(AccountQueries(unitOfWork: InMemoryUnitOfWork())))
+        let runtime = makeRuntime(InMemoryUnitOfWork())
+        await runtime.send("In one word, say hello.")
 
-        let session = try session(catalog: catalog)
-        let reply = try await session.send("In one word, say hello.")
-
-        #expect(await toolNames(session).isEmpty)
+        #expect(toolNames(runtime).isEmpty)
+        let reply = runtime.messages
+            .last(where: { $0.role == .assistant })
+            .map { $0.content.compactMap(\.asText).joined() } ?? ""
         #expect(!reply.isEmpty)
     }
 }

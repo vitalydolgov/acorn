@@ -10,7 +10,7 @@ public final class AgentRuntime {
     public var sendError: Error?
 
     private let client: any LLMClient
-    private let catalog: ToolCatalog
+    private let catalog: AgentToolCatalog
     private let model: String
     private let maxTokens: Int
     private let systemPrompt: String
@@ -24,7 +24,7 @@ public final class AgentRuntime {
         systemPrompt: String = "You are an assistant for the zero-based budgeting app. Respond concisely. Prefer actions over explanations.",
         maxIterations: Int = 10
     ) {
-        let catalog = ToolCatalog()
+        let catalog = AgentToolCatalog()
         self.catalog = catalog
         self.client = AnthropicClient(apiKeyProvider: {
             Bundle.main.infoDictionary?["ANTHROPIC_API_KEY"] as? String ?? ""
@@ -64,12 +64,11 @@ public final class AgentRuntime {
         messages.append(ChatMessage(role: .user, content: [.text(userText)]))
 
         for _ in 0..<maxIterations {
-            let descriptors = await catalog.descriptors()
             let request = ChatRequest(
                 model: model,
                 maxTokens: maxTokens,
                 system: [SystemBlock(text: systemPrompt, cacheControl: .ephemeral)],
-                tools: descriptors,
+                tools: await catalog.tools(),
                 messages: messages
             )
 

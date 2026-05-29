@@ -22,18 +22,18 @@ AcornApplication/
   Queries/    one struct per aggregate
   Shared/     UnitOfWork · shared value types
 AcornAgent/
-  Tools/      one *Tool.swift per operation — each a static factory on Tool
+  Tools/      one struct per aggregate
 ```
 
 ## Key concepts
 
-**Unit of Work** — `@UnitOfWork` wraps a method body in `unitOfWork.perform { ctx in … }`, providing `ctx: RepositoryContext` for repository access. Every state change must go through it; never call repositories directly.
+**Unit of work** — `@UnitOfWork` wraps a method body in `unitOfWork.perform { ctx in … }`, providing `ctx: RepositoryContext` for repository access. Every state change must go through it; never call repositories directly.
 
 **Commands** — one struct per aggregate (or coordinating domain concept), grouping all state-changing operations and holding shared dependencies once. Each method runs inside a unit of work.
 
 **Queries** — one struct per aggregate, grouping all read-only operations in the same shape as commands.
 
-**Agent tools** — each operation is a static factory on `Tool`, accepting the relevant command/query struct, defined as an extension in its own file.
+**Agent tools** — each operation is a private struct nested inside the relevant `*Tools` type, conforming to the `AgentTool` protocol. Each tool captures only the command or query dependency it needs.
 
 ## Conventions
 

@@ -13,7 +13,7 @@ A Swift library for zero-based budgeting, inspired by YNAB's mechanics. Scoped t
 ## Tech stack
 
 - iOS 17 / macOS 14
-- Swift 6.2 toolchain
+- Swift 6.3
 - Swift Testing
 - Anthropic API for the LLM agent
 

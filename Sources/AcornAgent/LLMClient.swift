@@ -9,14 +9,14 @@ public struct ChatRequest: Encodable, Sendable {
     public let model: String
     public let maxTokens: Int
     public let system: [SystemBlock]?
-    public let tools: [ToolDescriptor]
+    public let tools: [any AgentTool]
     public let messages: [ChatMessage]
 
     public init(
         model: String,
         maxTokens: Int,
         system: [SystemBlock]? = nil,
-        tools: [ToolDescriptor] = [],
+        tools: [any AgentTool] = [],
         messages: [ChatMessage]
     ) {
         self.model = model
@@ -24,6 +24,32 @@ public struct ChatRequest: Encodable, Sendable {
         self.system = system
         self.tools = tools
         self.messages = messages
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(model, forKey: .model)
+        try container.encode(maxTokens, forKey: .maxTokens)
+        try container.encodeIfPresent(system, forKey: .system)
+        try container.encode(tools.map(ToolEncoding.init), forKey: .tools)
+        try container.encode(messages, forKey: .messages)
+    }
+
+    private struct ToolEncoding: Encodable {
+        let name: String
+        let description: String
+        let schema: JSONSchema
+
+        init(_ tool: any AgentTool) {
+            self.name = tool.name
+            self.description = tool.description
+            self.schema = tool.schema
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case name, description
+            case schema = "input_schema"
+        }
     }
 
     enum CodingKeys: String, CodingKey {
