@@ -40,6 +40,7 @@ public struct AccountTools: Sendable {
             ChangeAccountName(commands: commands),
             CloseAccount(commands: commands),
             DeleteAccount(commands: commands),
+            ReconcileAccount(commands: commands),
             ReopenAccount(commands: commands),
             UpdateAccountMetadata(commands: commands),
         ]
@@ -379,6 +380,39 @@ private struct ReopenAccount: AgentTool {
         }
         let input = try JSONDecoder().decode(Input.self, from: JSONEncoder().encode(args))
         try await commands.reopen(accountID: input.accountID)
+        return .object(["ok": .bool(true)])
+    }
+}
+
+private struct ReconcileAccount: AgentTool {
+    let commands: AccountCommands
+
+    var name: String { "reconcile_account" }
+    var description: String {
+        """
+        Promote all cleared transactions for an account to reconciled (locked). \
+        Use this after the user has marked transactions cleared and confirmed the balance.
+        """
+    }
+    var schema: JSONSchema {
+        .object(
+            properties: [
+                "account_id": .string(
+                    description: "UUID of the account. Obtain via get_account_id or list_accounts.",
+                    format: .uuid
+                )
+            ],
+            required: ["account_id"]
+        )
+    }
+
+    func invoke(_ args: JSONValue) async throws -> JSONValue {
+        struct Input: Decodable {
+            let accountID: UUID
+            enum CodingKeys: String, CodingKey { case accountID = "account_id" }
+        }
+        let input = try JSONDecoder().decode(Input.self, from: JSONEncoder().encode(args))
+        try await commands.reconcile(accountID: input.accountID)
         return .object(["ok": .bool(true)])
     }
 }

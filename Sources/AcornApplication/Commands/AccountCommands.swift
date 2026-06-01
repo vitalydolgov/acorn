@@ -1,7 +1,6 @@
 import Foundation
 import AcornDomain
 
-/// State-changing operations on the Account aggregate.
 public struct AccountCommands: Sendable {
     private let unitOfWork: any UnitOfWork
     private let todayProvider: any TodayProvider
@@ -11,7 +10,9 @@ public struct AccountCommands: Sendable {
         self.todayProvider = todayProvider
     }
 
-    /// Add a new account. `name` must not be blank.
+    /// Add a new account.
+    ///
+    /// - Throws: If the name is blank.
     @UnitOfWork
     public func add(name: String, notes: String = "") async throws -> Account {
         let account = try Account.make(name: name, notes: notes)
@@ -20,6 +21,8 @@ public struct AccountCommands: Sendable {
     }
 
     /// Post a correcting adjustment transaction dated today to bring the account to a known balance.
+    ///
+    /// - Throws: If the account doesn't exist, is closed, or the amount is zero.
     @UnitOfWork
     public func adjustBalance(accountID: UUID, amount: Decimal) async throws -> Transaction {
         guard let account = try await ctx.accounts.fetch(id: accountID) else {
@@ -31,7 +34,9 @@ public struct AccountCommands: Sendable {
         return transaction
     }
 
-    /// Rename an account. `name` must not be blank.
+    /// Rename an account.
+    ///
+    /// - Throws: If the account doesn't exist or the new name is blank.
     @UnitOfWork
     public func changeName(accountID: UUID, name: String) async throws {
         guard var account = try await ctx.accounts.fetch(id: accountID) else {
@@ -42,6 +47,8 @@ public struct AccountCommands: Sendable {
     }
 
     /// Close an account, zeroing any non-zero balance with an adjustment dated today first.
+    ///
+    /// - Throws: If the account doesn't exist or is already closed.
     @UnitOfWork
     public func close(accountID: UUID) async throws {
         let today = todayProvider.today()
@@ -58,7 +65,9 @@ public struct AccountCommands: Sendable {
         try await ctx.accounts.save(account)
     }
 
-    /// Permanently delete an account. Fails if it has any non-deleted transactions or transfers.
+    /// Permanently delete an account.
+    ///
+    /// - Throws: If the account doesn't exist or still has active transactions.
     @UnitOfWork
     public func delete(accountID: UUID) async throws {
         guard var account = try await ctx.accounts.fetch(id: accountID) else {
@@ -72,7 +81,26 @@ public struct AccountCommands: Sendable {
         try await ctx.accounts.save(account)
     }
 
+    /// Promote all cleared transactions for an account to reconciled.
+    ///
+    /// - Throws: If the account doesn't exist or is closed.
+    @UnitOfWork
+    public func reconcile(accountID: UUID) async throws {
+        guard let account = try await ctx.accounts.fetch(id: accountID) else {
+            throw ApplicationError.notFound(accountID)
+        }
+        try account.assertPostable()
+
+        let transactions = try await ctx.transactions.fetchActive(forAccount: accountID)
+        for var tx in transactions where tx.status == .cleared {
+            try tx.reconcile()
+            try await ctx.transactions.save(tx)
+        }
+    }
+
     /// Reopen a closed account.
+    ///
+    /// - Throws: If the account doesn't exist or is not closed.
     @UnitOfWork
     public func reopen(accountID: UUID) async throws {
         guard var account = try await ctx.accounts.fetch(id: accountID) else {
@@ -83,6 +111,8 @@ public struct AccountCommands: Sendable {
     }
 
     /// Update an account's notes. Pass an empty string to clear.
+    ///
+    /// - Throws: If the account doesn't exist.
     @UnitOfWork
     public func updateMetadata(accountID: UUID, notes: String) async throws {
         guard var account = try await ctx.accounts.fetch(id: accountID) else {

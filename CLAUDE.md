@@ -53,6 +53,8 @@ ACORN_LLM_TESTS=1 swift test      # include live Anthropic API tests (paid)
 
 - Default to `internal`. Use `package` for declarations that must cross module boundaries within this package but should not be visible outside it. Use `public` only for what a presentation or infrastructure layer depending on this package would consume.
 
+- Doc comments are a single short line. No parameter or returns blocks. When the function can throw, add a `- Throws:` block describing the conditions — not the concrete error types.
+
 ## Documentation
 
 `README.md` — update the module list and capability coverage when layout or surface area changes.
