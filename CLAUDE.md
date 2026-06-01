@@ -1,29 +1,26 @@
 # Acorn
 
-Zero-based budgeting library (YNAB-inspired) in Swift, covering domain and application layers only — no UI. Domain operations run through a **dual interface**: a human-driven UI and an LLM agent that calls the same application use cases as tools.
+Zero-based budgeting library (YNAB-inspired), covering domain and application layers only — no UI. Domain operations run through a **dual interface**: a human-driven UI and an LLM agent that calls the same application use cases as tools.
 
 **Stack:** Swift 6.3
 
-## Modules
+## Architecture
 
-| Module | Role |
-| --- | --- |
-| `AcornDomain` | Entities, repository protocols, calculations, domain errors |
-| `AcornApplication` | Command/query structs, cross-aggregate coordination, `UnitOfWork` protocol |
-| `AcornMacros` | `@UnitOfWork` body macro — compiler plugin that wraps methods in a unit-of-work scope |
-| `AcornAgent` | Wraps application use cases as LLM tools; owns chat session and tool dispatch |
-| `AcornInMemory` | In-memory repositories and `UnitOfWork`; used exclusively in tests |
+Domain-Driven Design across two layers, dependencies pointing inward:
 
-## Layout
+- **Domain** — entities, repository protocols, domain logic. No infrastructure types (`Date`, `URLSession`, etc.).
+- **Application** — commands and queries that orchestrate the domain. Defines the `UnitOfWork` protocol; never touches infrastructure directly.
 
-```
-AcornApplication/
-  Commands/   one struct per aggregate
-  Queries/    one struct per aggregate
-  Shared/     UnitOfWork · shared value types
-AcornAgent/
-  Tools/      one struct per aggregate
-```
+`AcornAgent` is a consumer of the application layer, not a layer itself — it wraps use cases as LLM tools and owns the chat session. `AcornInMemory` provides test-only implementations of the repository and `UnitOfWork` protocols. `AcornMacros` is a compiler plugin with no runtime dependencies.
+
+### What goes where — quick test
+
+Before placing code, ask: *would this still make sense if the app were a CLI, a server endpoint, and a mobile application simultaneously?*
+
+- "Yes" → Domain
+- "Yes, but something has to drive it" → Application
+- "Only relevant to AI interaction" → Agent
+- "Only with this storage / only on this platform" → adapter, not in this package
 
 ## Key concepts
 
@@ -35,19 +32,26 @@ AcornAgent/
 
 **Agent tools** — each operation is a private struct nested inside the relevant `*Tools` type, conforming to the `AgentTool` protocol. Each tool captures only the command or query dependency it needs.
 
-## Conventions
+## Development
 
-- Swift 6, strict concurrency on. Domain types should be `Sendable` by construction (value types, no reference state).
-- Default to `internal`. Use `package` for declarations that must cross module boundaries within this package but should not be visible outside it. Use `public` only for what a presentation or infrastructure layer depending on this package would consume.
+Always run the build after every code change and fix all errors before reporting the task as done:
 
-## Tests
+```sh
+swift build
+```
 
-Mirror source layout; suites are named after the operation under test.
+Tests mirror source layout; suites are named after the operation under test. Run with:
 
 ```sh
 swift test                        # offline suite
 ACORN_LLM_TESTS=1 swift test      # include live Anthropic API tests (paid)
 ```
+
+### Conventions
+
+- Swift 6, strict concurrency on. Domain types should be `Sendable` by construction (value types, no reference state).
+
+- Default to `internal`. Use `package` for declarations that must cross module boundaries within this package but should not be visible outside it. Use `public` only for what a presentation or infrastructure layer depending on this package would consume.
 
 ## Documentation
 
