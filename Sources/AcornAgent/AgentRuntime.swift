@@ -10,7 +10,7 @@ public final class AgentRuntime {
     public var sendError: Error?
 
     private let client: any LLMClient
-    private let context: any AgentContext
+    private let context: () async throws -> String
     private let catalog: AgentToolCatalog
     private let model: String
     private let maxTokens: Int
@@ -23,7 +23,7 @@ public final class AgentRuntime {
         maxTokens: Int,
         systemInstructions: String,
         maxIterations: Int = 10,
-        context: any AgentContext,
+        context: @escaping () async throws -> String,
         unitOfWork: any UnitOfWork,
         todayProvider: any TodayProvider
     ) {
@@ -67,9 +67,10 @@ public final class AgentRuntime {
 
     private func performSend(_ userText: String) async throws {
         if sessionContext == nil {
-            sessionContext = try? await context.get()
+            sessionContext = try? await context()
         }
         messages.append(ChatMessage(role: .user, content: [.text(userText)]))
+        print("[user] \(userText)")
 
         var system = [SystemBlock(text: systemInstructions, cacheControl: .ephemeral)]
         if let ctx = sessionContext, !ctx.isEmpty {
@@ -87,6 +88,8 @@ public final class AgentRuntime {
 
             let response = try await client.complete(request)
             messages.append(ChatMessage(role: .assistant, content: response.content))
+            let text = response.content.compactMap(\.asText).joined(separator: "\n")
+            if !text.isEmpty { print("[assistant] \(text)") }
 
             let toolUses = response.content.compactMap(\.asToolUse)
             if toolUses.isEmpty { return }
