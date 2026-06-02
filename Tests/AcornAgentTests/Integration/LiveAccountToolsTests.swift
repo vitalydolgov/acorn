@@ -19,7 +19,7 @@ struct LiveAccountToolsTests {
                 ids with get_account_id before calling tools that need an id. \
                 If get_account_id reports ambiguity, ask the user to clarify.
                 """,
-            context: SessionContextProvider(unitOfWork: uow, todayProvider: todayProvider),
+            context: sessionContext(unitOfWork: uow, todayProvider: todayProvider),
             unitOfWork: uow,
             todayProvider: todayProvider
         )
