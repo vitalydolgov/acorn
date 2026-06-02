@@ -10,19 +10,22 @@ public final class AgentRuntime {
     public var sendError: Error?
 
     private let client: any LLMClient
+    private let context: any AgentContext
     private let catalog: AgentToolCatalog
     private let model: String
     private let maxTokens: Int
-    private let systemPrompt: String
     private let maxIterations: Int
+    private let systemInstructions: String
+    private var sessionContext: String?
 
     public init(
+        model: String,
+        maxTokens: Int,
+        systemInstructions: String,
+        maxIterations: Int = 10,
+        context: any AgentContext,
         unitOfWork: any UnitOfWork,
-        todayProvider: any TodayProvider,
-        model: String = "claude-haiku-4-5",
-        maxTokens: Int = 4096,
-        systemPrompt: String = "You are an assistant for the zero-based budgeting app. Respond concisely. Prefer actions over explanations.",
-        maxIterations: Int = 10
+        todayProvider: any TodayProvider
     ) {
         let catalog = AgentToolCatalog()
         self.catalog = catalog
@@ -31,8 +34,9 @@ public final class AgentRuntime {
         })
         self.model = model
         self.maxTokens = maxTokens
-        self.systemPrompt = systemPrompt
         self.maxIterations = maxIterations
+        self.systemInstructions = systemInstructions
+        self.context = context
 
         Task {
             let tools = AccountTools(unitOfWork: unitOfWork, todayProvider: todayProvider).all
@@ -56,18 +60,27 @@ public final class AgentRuntime {
         }
     }
 
-    public func reset() {
+    public func resetSession() {
+        sessionContext = nil
         messages = []
     }
 
     private func performSend(_ userText: String) async throws {
+        if sessionContext == nil {
+            sessionContext = try? await context.get()
+        }
         messages.append(ChatMessage(role: .user, content: [.text(userText)]))
+
+        var system = [SystemBlock(text: systemInstructions, cacheControl: .ephemeral)]
+        if let ctx = sessionContext, !ctx.isEmpty {
+            system.append(SystemBlock(text: ctx, cacheControl: .ephemeral))
+        }
 
         for _ in 0..<maxIterations {
             let request = ChatRequest(
                 model: model,
                 maxTokens: maxTokens,
-                system: [SystemBlock(text: systemPrompt, cacheControl: .ephemeral)],
+                system: system,
                 tools: await catalog.tools(),
                 messages: messages
             )

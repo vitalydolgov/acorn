@@ -11,17 +11,19 @@ import AcornInMemory
 @MainActor
 struct LiveAccountToolsJudgmentTests {
     private func makeRuntime(_ uow: InMemoryUnitOfWork) -> AgentRuntime {
-        AgentRuntime(
-            unitOfWork: uow,
-            todayProvider: SystemTodayProvider(),
+        let todayProvider = SystemTodayProvider()
+        return AgentRuntime(
             model: "claude-haiku-4-5",
             maxTokens: 512,
-            systemPrompt: """
+            systemInstructions: """
                 You are Acorn's chat agent. Use the provided tools to answer \
                 questions about the user's accounts. Resolve account names to \
                 ids with get_account_id before calling tools that need an id. \
                 If get_account_id reports ambiguity, ask the user to clarify.
-                """
+                """,
+            context: SessionContextProvider(unitOfWork: uow, todayProvider: todayProvider),
+            unitOfWork: uow,
+            todayProvider: todayProvider
         )
     }
 
