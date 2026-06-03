@@ -26,13 +26,6 @@ struct LiveAccountToolsJudgmentTests {
         )
     }
 
-    private func toolNames(_ runtime: AgentRuntime) -> [String] {
-        runtime.messages
-            .flatMap(\.content)
-            .compactMap(\.asToolUse)
-            .map(\.name)
-    }
-
     @Test("real model asks to disambiguate instead of guessing", .requiresLLM)
     func handlesAmbiguity() async throws {
         let uow = InMemoryUnitOfWork()
@@ -42,7 +35,7 @@ struct LiveAccountToolsJudgmentTests {
         let runtime = makeRuntime(uow)
         await runtime.send("What's the balance of my Savings account?")
 
-        let names = toolNames(runtime)
+        let names = toolNames(in: await runtime.messages)
         #expect(names.contains("get_account_id"))
         // Ambiguity must not be resolved into a balance lookup.
         #expect(!names.contains("calculate_balance"))
@@ -53,10 +46,8 @@ struct LiveAccountToolsJudgmentTests {
         let runtime = makeRuntime(InMemoryUnitOfWork())
         await runtime.send("In one word, say hello.")
 
-        #expect(toolNames(runtime).isEmpty)
-        let reply = runtime.messages
-            .last(where: { $0.role == .assistant })
-            .map { $0.content.compactMap(\.asText).joined() } ?? ""
-        #expect(!reply.isEmpty)
+        let messages = await runtime.messages
+        #expect(toolNames(in: messages).isEmpty)
+        #expect(!lastAssistantReply(in: messages).isEmpty)
     }
 }

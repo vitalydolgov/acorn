@@ -24,21 +24,6 @@ struct LiveAccountToolsTests {
         )
     }
 
-    private func send(_ text: String, runtime: AgentRuntime) async throws -> String {
-        await runtime.send(text)
-        if let error = runtime.sendError { throw error }
-        return runtime.messages
-            .last(where: { $0.role == .assistant })
-            .map { $0.content.compactMap(\.asText).joined() } ?? ""
-    }
-
-    private func toolNames(_ runtime: AgentRuntime) -> [String] {
-        runtime.messages
-            .flatMap(\.content)
-            .compactMap(\.asToolUse)
-            .map(\.name)
-    }
-
     @Test("real model dispatches list_accounts for an account question", .requiresLLM)
     func dispatchesListAccounts() async throws {
         let uow = InMemoryUnitOfWork()
@@ -46,9 +31,9 @@ struct LiveAccountToolsTests {
         try await uow.accounts.save(try Account.make(name: "Savings", notes: ""))
 
         let runtime = makeRuntime(uow)
-        _ = try await send("What accounts do I have?", runtime: runtime)
+        await runtime.send("What accounts do I have?")
 
-        #expect(toolNames(runtime).contains("list_accounts"))
+        #expect(toolNames(in: await runtime.messages).contains("list_accounts"))
     }
 
     @Test("real model chains get_account_id then calculate_balance", .requiresLLM)
@@ -61,16 +46,17 @@ struct LiveAccountToolsTests {
         )
 
         let runtime = makeRuntime(uow)
-        let reply = try await send("What's the balance of my Checking account?", runtime: runtime)
+        await runtime.send("What's the balance of my Checking account?")
 
-        let names = toolNames(runtime)
+        let messages = await runtime.messages
+        let names = toolNames(in: messages)
         #expect(names.contains("get_account_id"))
         #expect(names.contains("calculate_balance"))
         if let idIdx = names.firstIndex(of: "get_account_id"),
            let balIdx = names.firstIndex(of: "calculate_balance") {
             #expect(idIdx < balIdx)
         }
-        #expect(reply.contains("250"))
+        #expect(lastAssistantReply(in: messages).contains("250"))
     }
 
     @Test("real model renames an account without reading it first", .requiresLLM)
@@ -80,9 +66,9 @@ struct LiveAccountToolsTests {
         try await uow.accounts.save(checking)
 
         let runtime = makeRuntime(uow)
-        _ = try await send("Rename my Checking account to Everyday.", runtime: runtime)
+        await runtime.send("Rename my Checking account to Everyday.")
 
-        let names = toolNames(runtime)
+        let names = toolNames(in: await runtime.messages)
         #expect(names.contains("change_account_name"))
         #expect(!names.contains("get_account"))
 

@@ -39,3 +39,4 @@ Domain-Driven Design across two layers, dependencies pointing inward:
 ## Documentation
 
 - [`conventions.md`](Documentation/conventions.md) — coding conventions; consult before writing or reviewing any code.
+- [`repository.md`](Documentation/repository.md) — repository rules (commits, pull requests).
