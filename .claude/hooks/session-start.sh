@@ -4,34 +4,24 @@ set -euo pipefail
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 if command -v swift >/dev/null 2>&1; then swift --version; exit 0; fi
 
-# Fast path: a Swift toolchain is usually pre-extracted under /opt/swift.
-# /usr/local/bin is already on PATH, so symlinking the driver there makes
-# `swift` available without any network download. The driver dispatches
-# subcommands (build/test/package) relative to its resolved real path,
-# so a single symlink is enough.
-shopt -s nullglob
-candidates=(/opt/swift/*/usr/bin/swift)
-shopt -u nullglob
-if [ ${#candidates[@]} -gt 0 ]; then
-    preinstalled=$(printf '%s\n' "${candidates[@]}" | sort -V | tail -1)
-    if [ -x "${preinstalled}" ]; then
-        ln -sf "${preinstalled}" /usr/local/bin/swift
-        swift --version
-        exit 0
-    fi
-fi
+# Direct download from swift.org (swiftly's Apple CDN init endpoint is blocked).
+SWIFT_VERSION="6.3"
+SWIFT_RELEASE="swift-${SWIFT_VERSION}-RELEASE"
+. /etc/os-release
+PLATFORM_PATH="ubuntu${VERSION_ID//.}"   # e.g. ubuntu2404  (used in URL path)
+PLATFORM_FILE="ubuntu${VERSION_ID}"      # e.g. ubuntu24.04 (used in filename)
+TARBALL="${SWIFT_RELEASE}-${PLATFORM_FILE}.tar.gz"
+URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/${PLATFORM_PATH}/${SWIFT_RELEASE}/${TARBALL}"
+INSTALL_DIR="/opt/swift/${SWIFT_RELEASE}"
 
-# Fallback: install via swiftly. Reuse the pre-installed swiftly binary
-# if present; only download it when it's actually missing.
-export SWIFTLY_HOME_DIR=/opt/swiftly
-export SWIFTLY_BIN_DIR=/usr/local/bin
-
-if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "${SWIFTLY_BIN_DIR}/swiftly" ]; then
-    arch=$(uname -m)
-    curl -fsSL "https://download.swift.org/swiftly/linux/swiftly-${arch}.tar.gz" -o /tmp/swiftly.tar.gz
-    tar -xzf /tmp/swiftly.tar.gz -C /tmp
-    /tmp/swiftly init --assume-yes --skip-install --quiet-shell-followup
+if [ -x "${INSTALL_DIR}/usr/bin/swift" ]; then
+    echo "Swift ${SWIFT_VERSION} already extracted, skipping download."
+else
+    mkdir -p "${INSTALL_DIR}"
+    echo "Downloading Swift ${SWIFT_VERSION}..."
+    curl -fSL "${URL}" -o /tmp/swift.tar.gz
+    tar -xzf /tmp/swift.tar.gz -C "${INSTALL_DIR}" --strip-components=1
+    rm /tmp/swift.tar.gz
 fi
-[ -f "${SWIFTLY_HOME_DIR}/env.sh" ] && . "${SWIFTLY_HOME_DIR}/env.sh"
-swiftly install 6.2 --use
+ln -sf "${INSTALL_DIR}/usr/bin/swift" /usr/local/bin/swift
 swift --version
