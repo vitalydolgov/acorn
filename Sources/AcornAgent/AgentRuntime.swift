@@ -2,9 +2,13 @@ import Foundation
 import AcornDomain
 import AcornApplication
 
-@Observable
-@MainActor
-public final class AgentRuntime {
+public enum AgentEvent: @unchecked Sendable {
+    case message(ChatMessage)
+    case sending(Bool)
+    case error(any Error)
+}
+
+public actor AgentRuntime {
     public static let defaultModel = "claude-haiku-4-5"
     public static let defaultMaxTokens = 4096
     public static let defaultSystemInstructions = """
@@ -15,9 +19,10 @@ public final class AgentRuntime {
         - Never use markdown tables; use bullet lists or plain prose instead.
         """
 
-    public private(set) var messages: [ChatMessage] = []
-    public private(set) var isSending = false
-    public var sendError: Error?
+    internal var messages: [ChatMessage] = []
+
+    public nonisolated let events: AsyncStream<AgentEvent>
+    private var continuation: AsyncStream<AgentEvent>.Continuation?
 
     private let client: any LLMClient
     private let context: () async throws -> String
@@ -33,9 +38,13 @@ public final class AgentRuntime {
         maxTokens: Int = AgentRuntime.defaultMaxTokens,
         systemInstructions: String = AgentRuntime.defaultSystemInstructions,
         maxIterations: Int = 10,
-        context: @escaping (AgentDependencies) async throws -> String,
+        context: @escaping (AgentDependencies) async throws -> String = AgentRuntime.defaultContext,
         dependencies: AgentDependencies
     ) {
+        let (stream, continuation) = AsyncStream<AgentEvent>.makeStream()
+        self.events = stream
+        self.continuation = continuation
+
         let catalog = AgentToolCatalog()
         self.catalog = catalog
         self.client = AnthropicClient(apiKeyProvider: {
@@ -60,12 +69,12 @@ public final class AgentRuntime {
     public func send(_ text: String) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        isSending = true
-        defer { isSending = false }
+        emit(.sending(true))
+        defer { emit(.sending(false)) }
         do {
             try await performSend(trimmed)
         } catch {
-            sendError = error
+            emit(.error(error))
         }
     }
 
@@ -74,11 +83,17 @@ public final class AgentRuntime {
         messages = []
     }
 
+    private func emit(_ event: AgentEvent) {
+        continuation?.yield(event)
+    }
+
     private func performSend(_ userText: String) async throws {
         if sessionContext == nil {
             sessionContext = try? await context()
         }
-        messages.append(ChatMessage(role: .user, content: [.text(userText)]))
+        let userMessage = ChatMessage(role: .user, content: [.text(userText)])
+        messages.append(userMessage)
+        emit(.message(userMessage))
         print("[user] \(userText)")
 
         var system = [SystemBlock(text: systemInstructions, cacheControl: .ephemeral)]
@@ -96,11 +111,13 @@ public final class AgentRuntime {
             )
 
             let response = try await client.complete(request)
-            messages.append(ChatMessage(role: .assistant, content: response.content))
-            let text = response.content.compactMap(\.asText).joined(separator: "\n")
+            let assistantMessage = ChatMessage(role: .assistant, content: response.content)
+            messages.append(assistantMessage)
+            emit(.message(assistantMessage))
+            let text = assistantMessage.content.compactMap(\.asText).joined(separator: "\n")
             if !text.isEmpty { print("[assistant] \(text)") }
 
-            let toolUses = response.content.compactMap(\.asToolUse)
+            let toolUses = assistantMessage.content.compactMap(\.asToolUse)
             if toolUses.isEmpty { return }
 
             var results: [ContentBlock] = []
@@ -112,7 +129,9 @@ public final class AgentRuntime {
                     isError: outcome.isError
                 ))
             }
-            messages.append(ChatMessage(role: .user, content: results))
+            let toolResultMessage = ChatMessage(role: .user, content: results)
+            messages.append(toolResultMessage)
+            emit(.message(toolResultMessage))
         }
         throw LLMError.iterationLimit
     }
