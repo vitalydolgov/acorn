@@ -169,6 +169,109 @@ struct TransactionTests {
         }
     }
 
+    @Test("update rejects a split transaction")
+    func updateRejectsSplit() throws {
+        var tx = try Transaction.split(accountID: accountID, amount: 10, date: today, lineAmounts: [3, 7])
+        #expect(throws: DomainError.invalidState("transaction is split")) {
+            try tx.update(amount: 5, date: today)
+        }
+    }
+
+    // MARK: - split
+
+    @Test("a regular transaction is a single line and is not split")
+    func regularIsSingleLine() {
+        let tx = makeUncleared()
+        #expect(tx.lines.count == 1)
+        #expect(tx.isSplit == false)
+        #expect(tx.amount == 10)
+    }
+
+    @Test("split divides the amount across its lines")
+    func splitDividesAmount() throws {
+        let tx = try Transaction.split(accountID: accountID, amount: -100, date: today, lineAmounts: [-60, -40])
+        #expect(tx.isSplit)
+        #expect(tx.lines.count == 2)
+        #expect(tx.amount == -100)
+        #expect(tx.kind == .regular)
+        #expect(tx.status == .uncleared)
+    }
+
+    @Test("split can be created cleared")
+    func splitCanBeCleared() throws {
+        let tx = try Transaction.split(accountID: accountID, amount: 3, date: today, cleared: true, lineAmounts: [1, 2])
+        #expect(tx.status == .cleared)
+    }
+
+    @Test("split rejects fewer than two lines")
+    func splitRejectsTooFewLines() {
+        #expect(throws: DomainError.invalidArgument("a split needs at least two lines")) {
+            _ = try Transaction.split(accountID: accountID, amount: 10, date: today, lineAmounts: [10])
+        }
+    }
+
+    @Test("split rejects a zero line amount")
+    func splitRejectsZeroLine() {
+        #expect(throws: DomainError.invalidArgument("split line amounts must be non-zero")) {
+            _ = try Transaction.split(accountID: accountID, amount: 10, date: today, lineAmounts: [10, 0])
+        }
+    }
+
+    @Test("split rejects lines that do not sum to the amount")
+    func splitRejectsUnbalancedLines() {
+        #expect(throws: DomainError.invalidArgument("split lines must sum to the transaction amount")) {
+            _ = try Transaction.split(accountID: accountID, amount: -100, date: today, lineAmounts: [-60, -30])
+        }
+    }
+
+    // MARK: - reviseSplit
+
+    @Test("reviseSplit replaces the lines and divides the amount")
+    func reviseSplitReplacesLines() throws {
+        var tx = makeUncleared()
+        try tx.reviseSplit(amount: -100, lineAmounts: [-20, -30, -50], date: today)
+        #expect(tx.isSplit)
+        #expect(tx.lines.count == 3)
+        #expect(tx.amount == -100)
+    }
+
+    @Test("reviseSplit rejects a deleted transaction")
+    func reviseSplitRejectsDeleted() throws {
+        var tx = makeUncleared()
+        try tx.delete()
+        #expect(throws: DomainError.deleted) {
+            try tx.reviseSplit(amount: 3, lineAmounts: [1, 2], date: today)
+        }
+    }
+
+    @Test("reviseSplit rejects fewer than two lines")
+    func reviseSplitRejectsTooFewLines() throws {
+        var tx = makeUncleared()
+        #expect(throws: DomainError.invalidArgument("a split needs at least two lines")) {
+            try tx.reviseSplit(amount: 5, lineAmounts: [5], date: today)
+        }
+    }
+
+    @Test("reviseSplit rejects lines that do not sum to the amount")
+    func reviseSplitRejectsUnbalancedLines() throws {
+        var tx = makeUncleared()
+        #expect(throws: DomainError.invalidArgument("split lines must sum to the transaction amount")) {
+            try tx.reviseSplit(amount: 10, lineAmounts: [3, 5], date: today)
+        }
+    }
+
+    // MARK: - setDate
+
+    @Test("setDate changes the date of a split without touching its lines")
+    func setDateKeepsSplitLines() throws {
+        var tx = try Transaction.split(accountID: accountID, amount: 10, date: today, lineAmounts: [3, 7])
+        let later = today.adding(days: 5)
+        try tx.setDate(later)
+        #expect(tx.date == later)
+        #expect(tx.amount == 10)
+        #expect(tx.lines.count == 2)
+    }
+
     // MARK: - delete
 
     @Test("delete rejects an already-deleted transaction")

@@ -4,17 +4,23 @@ public struct Transaction: Versioned, Sendable {
     public let id: UUID
     public var version: Int = 0
     public let accountID: UUID
-    public private(set) var amount: Decimal
+    public private(set) var lines: [TransactionLine]
     public private(set) var date: AcornDate
     public private(set) var status: TransactionStatus
     public let kind: TransactionKind
     public private(set) var isDeleted: Bool = false
 
+    /// The transaction total — the sum of its lines.
+    public var amount: Decimal { lines.reduce(0) { $0 + $1.amount } }
+
+    /// Whether the transaction is split across more than one line.
+    public var isSplit: Bool { lines.count > 1 }
+
     public static func rehydrate(
         id: UUID,
         version: Int,
         accountID: UUID,
-        amount: Decimal,
+        lines: [TransactionLine],
         date: AcornDate,
         status: TransactionStatus,
         kind: TransactionKind,
@@ -24,7 +30,7 @@ public struct Transaction: Versioned, Sendable {
             id: id,
             version: version,
             accountID: accountID,
-            amount: amount,
+            lines: lines,
             date: date,
             status: status,
             kind: kind,
@@ -41,7 +47,7 @@ public struct Transaction: Versioned, Sendable {
         Transaction(
             id: UUID(),
             accountID: accountID,
-            amount: amount,
+            lines: [TransactionLine(amount: amount)],
             date: date,
             status: cleared ? .cleared : .uncleared,
             kind: .regular
@@ -59,11 +65,45 @@ public struct Transaction: Versioned, Sendable {
         return Transaction(
             id: UUID(),
             accountID: accountID,
-            amount: amount,
+            lines: [TransactionLine(amount: amount)],
             date: date,
             status: .uncleared,
             kind: .adjustment
         )
+    }
+
+    /// Builds a split transaction by dividing `amount` across `lineAmounts`.
+    ///
+    /// - Throws: if fewer than two lines are given, any line amount is zero, or the lines do not
+    ///   sum to `amount`.
+    package static func split(
+        accountID: UUID,
+        amount: Decimal,
+        date: AcornDate,
+        cleared: Bool = false,
+        lineAmounts: [Decimal]
+    ) throws -> Transaction {
+        try validateSplit(lineAmounts, total: amount)
+        return Transaction(
+            id: UUID(),
+            accountID: accountID,
+            lines: lineAmounts.map { TransactionLine(amount: $0) },
+            date: date,
+            status: cleared ? .cleared : .uncleared,
+            kind: .regular
+        )
+    }
+
+    private static func validateSplit(_ lineAmounts: [Decimal], total: Decimal) throws {
+        guard lineAmounts.count >= 2 else {
+            throw DomainError.invalidArgument("a split needs at least two lines")
+        }
+        guard lineAmounts.allSatisfy({ $0 != 0 }) else {
+            throw DomainError.invalidArgument("split line amounts must be non-zero")
+        }
+        guard lineAmounts.reduce(0, +) == total else {
+            throw DomainError.invalidArgument("split lines must sum to the transaction amount")
+        }
     }
 
     /// Builds the two mirrored legs of a transfer: an outflow on the source
@@ -85,7 +125,7 @@ public struct Transaction: Versioned, Sendable {
         let from = Transaction(
             id: UUID(),
             accountID: fromAccountID,
-            amount: -amount,
+            lines: [TransactionLine(amount: -amount)],
             date: date,
             status: fromAccountID == clearedAccountID ? .cleared : .uncleared,
             kind: .transfer(id: transferID, counterpartAccountID: toAccountID)
@@ -93,7 +133,7 @@ public struct Transaction: Versioned, Sendable {
         let to = Transaction(
             id: UUID(),
             accountID: toAccountID,
-            amount: amount,
+            lines: [TransactionLine(amount: amount)],
             date: date,
             status: toAccountID == clearedAccountID ? .cleared : .uncleared,
             kind: .transfer(id: transferID, counterpartAccountID: fromAccountID)
@@ -116,9 +156,33 @@ public struct Transaction: Versioned, Sendable {
         return false
     }
 
+    /// Changes the amount and date of a single-line transaction.
+    ///
+    /// - Throws: if the transaction is deleted or split.
     package mutating func update(amount: Decimal, date: AcornDate) throws {
         guard !isDeleted else { throw DomainError.deleted }
-        self.amount = amount
+        guard !isSplit else { throw DomainError.invalidState("transaction is split") }
+        lines[0].amount = amount
+        self.date = date
+    }
+
+    /// Replaces a transaction's lines by dividing `amount` across `lineAmounts`, making it a split,
+    /// and sets its date.
+    ///
+    /// - Throws: if the transaction is deleted, fewer than two lines are given, any line amount is
+    ///   zero, or the lines do not sum to `amount`.
+    package mutating func reviseSplit(amount: Decimal, lineAmounts: [Decimal], date: AcornDate) throws {
+        guard !isDeleted else { throw DomainError.deleted }
+        try Self.validateSplit(lineAmounts, total: amount)
+        lines = lineAmounts.map { TransactionLine(amount: $0) }
+        self.date = date
+    }
+
+    /// Changes a transaction's date, leaving its lines untouched.
+    ///
+    /// - Throws: if the transaction is deleted.
+    package mutating func setDate(_ date: AcornDate) throws {
+        guard !isDeleted else { throw DomainError.deleted }
         self.date = date
     }
 
@@ -129,7 +193,7 @@ public struct Transaction: Versioned, Sendable {
         guard amount > 0 else {
             throw DomainError.invalidArgument("amount must be positive")
         }
-        self.amount = self.amount < 0 ? -amount : amount
+        lines[0].amount = lines[0].amount < 0 ? -amount : amount
         self.date = date
     }
 

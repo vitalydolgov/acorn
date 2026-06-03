@@ -9,7 +9,7 @@ public struct TransactionCommands: Sendable {
         self.unitOfWork = unitOfWork
     }
 
-    /// Change a transaction's amount. Rejects transfer legs.
+    /// Change a transaction's amount. Rejects transfer legs and splits.
     @UnitOfWork
     public func changeAmount(transactionID: UUID, amount: Decimal) async throws {
         guard var transaction = try await ctx.transactions.fetch(id: transactionID) else {
@@ -17,6 +17,9 @@ public struct TransactionCommands: Sendable {
         }
         guard !transaction.isTransferLeg else {
             throw ApplicationError.invalidArgument("cannot edit a transfer leg directly")
+        }
+        guard !transaction.isSplit else {
+            throw ApplicationError.invalidArgument("transaction is split; use ChangeSplit")
         }
         try transaction.update(amount: amount, date: transaction.date)
         try await ctx.transactions.save(transaction)
@@ -31,12 +34,12 @@ public struct TransactionCommands: Sendable {
         guard !transaction.isTransferLeg else {
             throw ApplicationError.invalidArgument("cannot edit a transfer leg directly")
         }
-        try transaction.update(amount: transaction.amount, date: date)
+        try transaction.setDate(date)
         try await ctx.transactions.save(transaction)
     }
 
     /// Edit a transaction's amount, date, and cleared state. If `details` names a counterpart account
-    /// the transaction is replaced with a transfer; rejects transfer legs.
+    /// the transaction is replaced with a transfer; rejects transfer legs and splits.
     @UnitOfWork
     public func changeDetails(transactionID: UUID, details: TransactionDetails) async throws {
         guard var transaction = try await ctx.transactions.fetch(id: transactionID) else {
@@ -44,6 +47,9 @@ public struct TransactionCommands: Sendable {
         }
         guard !transaction.isTransferLeg else {
             throw ApplicationError.invalidArgument("cannot edit a transfer leg directly")
+        }
+        guard !transaction.isSplit else {
+            throw ApplicationError.invalidArgument("transaction is split; use ChangeSplit")
         }
         let accountID = transaction.accountID
 
@@ -118,6 +124,53 @@ public struct TransactionCommands: Sendable {
         let transaction = Transaction.add(accountID: accountID, amount: amount, date: date, cleared: cleared)
         try await ctx.transactions.save(transaction)
         return transaction
+    }
+
+    /// Record a split transaction against an open account: `amount` is the transaction total,
+    /// divided across `lineAmounts` (at least two non-zero amounts that must sum to `amount`).
+    @UnitOfWork
+    public func recordSplit(
+        accountID: UUID,
+        amount: Decimal,
+        lineAmounts: [Decimal],
+        date: AcornDate,
+        cleared: Bool = false
+    ) async throws -> Transaction {
+        guard let account = try await ctx.accounts.fetch(id: accountID) else {
+            throw ApplicationError.notFound(accountID)
+        }
+        try account.assertPostable()
+        let transaction = try Transaction.split(
+            accountID: accountID,
+            amount: amount,
+            date: date,
+            cleared: cleared,
+            lineAmounts: lineAmounts
+        )
+        try await ctx.transactions.save(transaction)
+        return transaction
+    }
+
+    /// Replace a transaction's lines, date, and cleared state, making it a split. Rejects transfer
+    /// legs. `amount` is the transaction total, divided across `lineAmounts` (at least two non-zero
+    /// amounts that must sum to `amount`).
+    @UnitOfWork
+    public func changeSplit(
+        transactionID: UUID,
+        amount: Decimal,
+        lineAmounts: [Decimal],
+        date: AcornDate,
+        cleared: Bool
+    ) async throws {
+        guard var transaction = try await ctx.transactions.fetch(id: transactionID) else {
+            throw ApplicationError.notFound(transactionID)
+        }
+        guard !transaction.isTransferLeg else {
+            throw ApplicationError.invalidArgument("cannot edit a transfer leg directly")
+        }
+        try transaction.reviseSplit(amount: amount, lineAmounts: lineAmounts, date: date)
+        try transaction.setCleared(cleared)
+        try await ctx.transactions.save(transaction)
     }
 
     /// Record a transaction or transfer from a unified details value, dispatching on whether a
