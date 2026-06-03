@@ -1,26 +1,30 @@
 # Acorn
 
-Zero-based budgeting library (YNAB-inspired), covering domain and application layers only — no UI. Domain operations run through a **dual interface**: a human-driven UI and an LLM agent that calls the same application use cases as tools.
+A library for zero-based budgeting, inspired by YNAB's mechanics. Scoped to the **domain** and **application** layers only — no UI. Domain operations run through a **dual interface**: a human user (UI) and an LLM agent that invokes the same application use cases as tools.
 
-**Stack:** Swift 6.3
+**Stack:** Swift 6
+
+## Features
+
+- **Atomic operations** — every change runs in a unit of work and either fully commits or rolls back.
+- **Built-in LLM agent** — a ready-made agent runtime (chat session, tool catalog, Anthropic client) that drives the same use cases through natural language.
 
 ## Architecture
 
 Domain-Driven Design across two layers, dependencies pointing inward:
 
-- **Domain** — entities, repository protocols, domain logic. No infrastructure types (`Date`, `URLSession`, etc.).
+- **Domain** — entities, value objects, repository protocols, domain logic. No infrastructure types (`Date`, `URLSession`, etc.).
 - **Application** — commands and queries that orchestrate the domain. Defines the `UnitOfWork` protocol; never touches infrastructure directly.
 
 `AcornAgent` is a consumer of the application layer, not a layer itself — it wraps use cases as LLM tools and owns the chat session. `AcornInMemory` provides test-only implementations of the repository and `UnitOfWork` protocols. `AcornMacros` is a compiler plugin with no runtime dependencies.
 
-### What goes where — quick test
+### Modules
 
-Before placing code, ask: *would this still make sense if the app were a CLI, a server endpoint, and a mobile application simultaneously?*
-
-- "Yes" → Domain
-- "Yes, but something has to drive it" → Application
-- "Only relevant to AI interaction" → Agent
-- "Only with this storage / only on this platform" → adapter, not in this package
+- `AcornDomain` — entities, value objects, repository protocols, domain logic.
+- `AcornApplication` — commands and queries over the domain, plus the `UnitOfWork` protocol for use cases that span aggregates.
+- `AcornMacros` — macros that remove boilerplate from the application layer.
+- `AcornAgent` — exposes application use cases to an LLM as tools.
+- `AcornInMemory` — in-memory persistence implementation. Shared test store, not a production adapter.
 
 ## Key concepts
 
@@ -32,29 +36,6 @@ Before placing code, ask: *would this still make sense if the app were a CLI, a 
 
 **Agent tools** — each operation is a private struct nested inside the relevant `*Tools` type, conforming to the `AgentTool` protocol. Each tool captures only the command or query dependency it needs.
 
-## Development
-
-Always run the build after every code change and fix all errors before reporting the task as done:
-
-```sh
-swift build
-```
-
-Tests mirror source layout; suites are named after the operation under test. Run with:
-
-```sh
-swift test                        # offline suite
-ACORN_LLM_TESTS=1 swift test      # include live Anthropic API tests (paid)
-```
-
-### Conventions
-
-- Swift 6, strict concurrency on. Domain types should be `Sendable` by construction (value types, no reference state).
-
-- Default to `internal`. Use `package` for declarations that must cross module boundaries within this package but should not be visible outside it. Use `public` only for what a presentation or infrastructure layer depending on this package would consume.
-
-- Doc comments are a single short line. No parameter or returns blocks. When the function can throw, add a `- Throws:` block describing the conditions — not the concrete error types.
-
 ## Documentation
 
-`README.md` — update the module list and capability coverage when layout or surface area changes.
+- [`conventions.md`](Documentation/conventions.md) — coding conventions; consult before writing or reviewing any code.
