@@ -5,6 +5,16 @@ import AcornApplication
 @Observable
 @MainActor
 public final class AgentRuntime {
+    public static let defaultModel = "claude-haiku-4-5"
+    public static let defaultMaxTokens = 4096
+    public static let defaultSystemInstructions = """
+        You are an assistant for the zero-based budgeting app. Respond concisely. Prefer actions over explanations.
+
+        Guardrails:
+        - Never expose internal identifiers in responses; refer to accounts and transactions by their user-visible names and dates only.
+        - Never use markdown tables; use bullet lists or plain prose instead.
+        """
+
     public private(set) var messages: [ChatMessage] = []
     public private(set) var isSending = false
     public var sendError: Error?
@@ -19,13 +29,12 @@ public final class AgentRuntime {
     private var sessionContext: String?
 
     public init(
-        model: String,
-        maxTokens: Int,
-        systemInstructions: String,
+        model: String = AgentRuntime.defaultModel,
+        maxTokens: Int = AgentRuntime.defaultMaxTokens,
+        systemInstructions: String = AgentRuntime.defaultSystemInstructions,
         maxIterations: Int = 10,
-        context: @escaping () async throws -> String,
-        unitOfWork: any UnitOfWork,
-        todayProvider: any TodayProvider
+        context: @escaping (AgentDependencies) async throws -> String,
+        dependencies: AgentDependencies
     ) {
         let catalog = AgentToolCatalog()
         self.catalog = catalog
@@ -36,12 +45,12 @@ public final class AgentRuntime {
         self.maxTokens = maxTokens
         self.maxIterations = maxIterations
         self.systemInstructions = systemInstructions
-        self.context = context
+        self.context = { try await context(dependencies) }
 
         Task {
-            let tools = AccountTools(unitOfWork: unitOfWork, todayProvider: todayProvider).all
-                + TransactionTools(unitOfWork: unitOfWork).all
-                + TransferTools(unitOfWork: unitOfWork).all
+            let tools = AccountTools(unitOfWork: dependencies.unitOfWork, todayProvider: dependencies.todayProvider).all
+                + TransactionTools(unitOfWork: dependencies.unitOfWork).all
+                + TransferTools(unitOfWork: dependencies.unitOfWork).all
             for tool in tools {
                 await catalog.register(tool)
             }
@@ -106,5 +115,18 @@ public final class AgentRuntime {
             messages.append(ChatMessage(role: .user, content: results))
         }
         throw LLMError.iterationLimit
+    }
+}
+
+extension AgentRuntime {
+    public nonisolated static func defaultContext(_ dependencies: AgentDependencies) async throws -> String {
+        let today = dependencies.todayProvider.today()
+        let accounts = try await AccountQueries(unitOfWork: dependencies.unitOfWork).list()
+        var lines = ["Today: \(today.year)-\(today.month)-\(today.day)"]
+        if !accounts.isEmpty {
+            lines.append("Accounts:")
+            lines += accounts.map { "- \($0.name)" }
+        }
+        return lines.joined(separator: "\n")
     }
 }
