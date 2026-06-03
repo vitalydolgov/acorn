@@ -618,4 +618,191 @@ struct TransactionCommandsTests {
             try await sut.commands.unclear(transactionID: tx.id)
         }
     }
+
+    // MARK: - recordSplit
+
+    @Test("records a split dividing the amount across its lines")
+    func recordSplitRecordsSplit() async throws {
+        let sut = try await SUT()
+
+        let tx = try await sut.commands.recordSplit(
+            accountID: sut.seedAccount.id,
+            amount: -100,
+            lineAmounts: [-60, -40],
+            date: Self.today
+        )
+
+        #expect(tx.isSplit)
+        #expect(tx.amount == -100)
+        let stored = try #require(try await sut.transactions.fetch(id: tx.id))
+        #expect(stored.lines.count == 2)
+        #expect(stored.amount == -100)
+        #expect(stored.kind == .regular)
+    }
+
+    @Test("records a cleared split")
+    func recordSplitRecordsCleared() async throws {
+        let sut = try await SUT()
+
+        let tx = try await sut.commands.recordSplit(
+            accountID: sut.seedAccount.id,
+            amount: 30,
+            lineAmounts: [10, 20],
+            date: Self.today,
+            cleared: true
+        )
+
+        #expect(tx.status == .cleared)
+    }
+
+    @Test("fails for an unknown account")
+    func recordSplitFailsForUnknownAccount() async throws {
+        let sut = try await SUT()
+        await #expect(throws: ApplicationError.self) {
+            _ = try await sut.commands.recordSplit(accountID: UUID(), amount: 3, lineAmounts: [1, 2], date: Self.today)
+        }
+    }
+
+    @Test("fails on a closed account")
+    func recordSplitFailsOnClosedAccount() async throws {
+        let sut = try await SUT()
+        var closed = sut.seedAccount
+        try closed.close()
+        try await sut.accounts.save(closed)
+
+        await #expect(throws: DomainError.invalidState("account is closed")) {
+            _ = try await sut.commands.recordSplit(accountID: sut.seedAccount.id, amount: 3, lineAmounts: [1, 2], date: Self.today)
+        }
+    }
+
+    @Test("rejects fewer than two lines")
+    func recordSplitRejectsTooFewLines() async throws {
+        let sut = try await SUT()
+        await #expect(throws: DomainError.invalidArgument("a split needs at least two lines")) {
+            _ = try await sut.commands.recordSplit(accountID: sut.seedAccount.id, amount: 10, lineAmounts: [10], date: Self.today)
+        }
+    }
+
+    @Test("rejects lines that do not sum to the amount")
+    func recordSplitRejectsUnbalancedLines() async throws {
+        let sut = try await SUT()
+        await #expect(throws: DomainError.invalidArgument("split lines must sum to the transaction amount")) {
+            _ = try await sut.commands.recordSplit(accountID: sut.seedAccount.id, amount: -100, lineAmounts: [-60, -30], date: Self.today)
+        }
+    }
+
+    // MARK: - changeSplit
+
+    @Test("turns a regular transaction into a split")
+    func changeSplitConvertsRegular() async throws {
+        let sut = try await SUT()
+        let tx = try await sut.commands.record(accountID: sut.seedAccount.id, amount: -100, date: Self.today)
+
+        try await sut.commands.changeSplit(
+            transactionID: tx.id,
+            amount: -100,
+            lineAmounts: [-60, -40],
+            date: Self.today,
+            cleared: false
+        )
+
+        let stored = try #require(try await sut.transactions.fetch(id: tx.id))
+        #expect(stored.isSplit)
+        #expect(stored.lines.count == 2)
+        #expect(stored.amount == -100)
+    }
+
+    @Test("revises an existing split and its cleared state")
+    func changeSplitRevisesSplit() async throws {
+        let sut = try await SUT()
+        let tx = try await sut.commands.recordSplit(
+            accountID: sut.seedAccount.id,
+            amount: -100,
+            lineAmounts: [-60, -40],
+            date: Self.today
+        )
+
+        try await sut.commands.changeSplit(
+            transactionID: tx.id,
+            amount: -100,
+            lineAmounts: [-20, -30, -50],
+            date: Self.today,
+            cleared: true
+        )
+
+        let stored = try #require(try await sut.transactions.fetch(id: tx.id))
+        #expect(stored.lines.count == 3)
+        #expect(stored.amount == -100)
+        #expect(stored.status == .cleared)
+    }
+
+    @Test("rejects lines that do not sum to the amount")
+    func changeSplitRejectsUnbalancedLines() async throws {
+        let sut = try await SUT()
+        let tx = try await sut.commands.record(accountID: sut.seedAccount.id, amount: -100, date: Self.today)
+
+        await #expect(throws: DomainError.invalidArgument("split lines must sum to the transaction amount")) {
+            try await sut.commands.changeSplit(transactionID: tx.id, amount: -100, lineAmounts: [-60, -30], date: Self.today, cleared: false)
+        }
+    }
+
+    @Test("fails for unknown transaction")
+    func changeSplitFailsForUnknown() async throws {
+        let sut = try await SUT()
+        await #expect(throws: ApplicationError.self) {
+            try await sut.commands.changeSplit(transactionID: UUID(), amount: 3, lineAmounts: [1, 2], date: Self.today, cleared: false)
+        }
+    }
+
+    @Test("rejects editing a transfer leg directly")
+    func changeSplitRejectsTransferLeg() async throws {
+        let sut = try await SUT()
+        let legs = try Transaction.transfer(
+            fromAccountID: sut.seedAccount.id,
+            toAccountID: UUID(),
+            amount: 10,
+            date: Self.today
+        )
+        try await sut.transactions.save(legs.from)
+
+        await #expect(throws: ApplicationError.self) {
+            try await sut.commands.changeSplit(transactionID: legs.from.id, amount: 3, lineAmounts: [1, 2], date: Self.today, cleared: false)
+        }
+    }
+
+    // MARK: - split rejection by single-amount editors
+
+    @Test("changeAmount rejects a split")
+    func changeAmountRejectsSplit() async throws {
+        let sut = try await SUT()
+        let tx = try await sut.commands.recordSplit(accountID: sut.seedAccount.id, amount: 3, lineAmounts: [1, 2], date: Self.today)
+
+        await #expect(throws: ApplicationError.self) {
+            try await sut.commands.changeAmount(transactionID: tx.id, amount: 5)
+        }
+    }
+
+    @Test("changeDetails rejects a split")
+    func changeDetailsRejectsSplit() async throws {
+        let sut = try await SUT()
+        let tx = try await sut.commands.recordSplit(accountID: sut.seedAccount.id, amount: 3, lineAmounts: [1, 2], date: Self.today)
+
+        await #expect(throws: ApplicationError.self) {
+            try await sut.commands.changeDetails(transactionID: tx.id, details: sut.details(amount: 5))
+        }
+    }
+
+    @Test("changeDate moves a split without touching its lines")
+    func changeDateMovesSplit() async throws {
+        let sut = try await SUT()
+        let tx = try await sut.commands.recordSplit(accountID: sut.seedAccount.id, amount: 10, lineAmounts: [3, 7], date: Self.today)
+        let newDate = Self.today.adding(days: 3)
+
+        try await sut.commands.changeDate(transactionID: tx.id, date: newDate)
+
+        let stored = try #require(try await sut.transactions.fetch(id: tx.id))
+        #expect(stored.date == newDate)
+        #expect(stored.lines.count == 2)
+        #expect(stored.amount == 10)
+    }
 }

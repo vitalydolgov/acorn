@@ -3,6 +3,16 @@ import JSONSchema
 import AcornApplication
 import AcornDomain
 
+struct TransactionLineDTO: Encodable {
+    let id: UUID
+    let amount: String
+
+    init(from line: TransactionLine) {
+        self.id = line.id
+        self.amount = NSDecimalNumber(decimal: line.amount).stringValue
+    }
+}
+
 struct TransactionDTO: Encodable {
     let id: UUID
     let accountID: UUID
@@ -12,6 +22,8 @@ struct TransactionDTO: Encodable {
     let isTransferLeg: Bool
     let transferID: UUID?
     let counterpartAccountID: UUID?
+    let isSplit: Bool
+    let lines: [TransactionLineDTO]
 
     init(from transaction: Transaction) {
         self.id = transaction.id
@@ -27,14 +39,17 @@ struct TransactionDTO: Encodable {
         self.isTransferLeg = transaction.isTransferLeg
         self.transferID = transaction.transferID
         self.counterpartAccountID = transaction.counterpartAccountID
+        self.isSplit = transaction.isSplit
+        self.lines = transaction.lines.map(TransactionLineDTO.init(from:))
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, amount, date, status
+        case id, amount, date, status, lines
         case accountID = "account_id"
         case isTransferLeg = "is_transfer_leg"
         case transferID = "transfer_id"
         case counterpartAccountID = "counterpart_account_id"
+        case isSplit = "is_split"
     }
 }
 
@@ -53,6 +68,8 @@ public struct TransactionTools: Sendable {
         [
             RecordTransaction(commands: commands),
             RecordDetails(commands: commands),
+            RecordSplit(commands: commands),
+            ChangeSplit(commands: commands),
             ChangeTransactionAmount(commands: commands),
             ChangeTransactionDate(commands: commands),
             ChangeTransactionDetails(commands: commands),
@@ -178,6 +195,129 @@ private struct RecordDetails: AgentTool {
     }
 }
 
+private struct RecordSplit: AgentTool {
+    let commands: TransactionCommands
+
+    var name: String { "record_split" }
+    var description: String {
+        """
+        Record a split transaction against an open account: one transaction whose total is divided \
+        across two or more lines. Provide the transaction amount (the total) and at least two \
+        non-zero line amounts that must sum to it. Returns the created transaction including its lines.
+        """
+    }
+    var schema: JSONSchema {
+        .object(
+            properties: [
+                "account_id": .string(
+                    description: "UUID of the account. Obtain via get_account_id or list_accounts.",
+                    format: .uuid
+                ),
+                "amount": .string(
+                    description: "Signed decimal transaction total; the lines must sum to this. E.g. \"-100.00\"."
+                ),
+                "lines": .array(
+                    description: "Two or more split lines summing to amount. Each is signed: positive inflow, negative outflow.",
+                    items: .object(
+                        properties: [
+                            "amount": .string(description: "Signed decimal amount, e.g. \"-42.50\".")
+                        ],
+                        required: ["amount"]
+                    ),
+                    minItems: 2
+                ),
+                "date": .string(description: "Transaction date in YYYY-MM-DD format."),
+                "cleared": .boolean(description: "Pass true if the transaction is already cleared.")
+            ],
+            required: ["account_id", "amount", "lines", "date", "cleared"]
+        )
+    }
+
+    func invoke(_ args: JSONValue) async throws -> JSONValue {
+        struct Line: Decodable { let amount: String }
+        struct Input: Decodable {
+            let accountID: UUID
+            let amount: String
+            let lines: [Line]
+            let date: String
+            let cleared: Bool
+            enum CodingKeys: String, CodingKey {
+                case accountID = "account_id"
+                case amount, lines, date, cleared
+            }
+        }
+        let input = try JSONDecoder().decode(Input.self, from: JSONEncoder().encode(args))
+        let tx = try await commands.recordSplit(
+            accountID: input.accountID,
+            amount: try parseDecimal(input.amount),
+            lineAmounts: try input.lines.map { try parseDecimal($0.amount) },
+            date: try parseDate(input.date),
+            cleared: input.cleared
+        )
+        return try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(TransactionDTO(from: tx)))
+    }
+}
+
+private struct ChangeSplit: AgentTool {
+    let commands: TransactionCommands
+
+    var name: String { "change_split" }
+    var description: String {
+        """
+        Replace a transaction's lines, date, and cleared state, making it a split. \
+        Provide the transaction amount (the total) and at least two non-zero line amounts that must \
+        sum to it. Rejects transfer legs.
+        """
+    }
+    var schema: JSONSchema {
+        .object(
+            properties: [
+                "transaction_id": .string(description: "UUID of the transaction.", format: .uuid),
+                "amount": .string(
+                    description: "Signed decimal transaction total; the lines must sum to this. E.g. \"-100.00\"."
+                ),
+                "lines": .array(
+                    description: "Two or more split lines summing to amount. Each is signed: positive inflow, negative outflow.",
+                    items: .object(
+                        properties: [
+                            "amount": .string(description: "Signed decimal amount, e.g. \"-42.50\".")
+                        ],
+                        required: ["amount"]
+                    ),
+                    minItems: 2
+                ),
+                "date": .string(description: "Date in YYYY-MM-DD format."),
+                "cleared": .boolean(description: "Cleared state.")
+            ],
+            required: ["transaction_id", "amount", "lines", "date", "cleared"]
+        )
+    }
+
+    func invoke(_ args: JSONValue) async throws -> JSONValue {
+        struct Line: Decodable { let amount: String }
+        struct Input: Decodable {
+            let transactionID: UUID
+            let amount: String
+            let lines: [Line]
+            let date: String
+            let cleared: Bool
+            enum CodingKeys: String, CodingKey {
+                case transactionID = "transaction_id"
+                case amount, lines, date, cleared
+            }
+        }
+        let input = try JSONDecoder().decode(Input.self, from: JSONEncoder().encode(args))
+        try await commands.changeSplit(
+            transactionID: input.transactionID,
+            amount: try parseDecimal(input.amount),
+            lineAmounts: try input.lines.map { try parseDecimal($0.amount) },
+            date: try parseDate(input.date),
+            cleared: input.cleared
+        )
+        return .object(["ok": .bool(true)])
+    }
+}
+
 private struct GetTransaction: AgentTool {
     let queries: TransactionQueries
 
@@ -241,7 +381,7 @@ private struct ChangeTransactionAmount: AgentTool {
     let commands: TransactionCommands
 
     var name: String { "change_transaction_amount" }
-    var description: String { "Change the amount of a regular (non-transfer) transaction." }
+    var description: String { "Change the amount of a regular (non-transfer, non-split) transaction. For splits use change_split." }
     var schema: JSONSchema {
         .object(
             properties: [
@@ -301,7 +441,8 @@ private struct ChangeTransactionDetails: AgentTool {
         """
         Edit a transaction's amount, date, and cleared state. \
         If counterpart_account_id is provided the transaction is replaced with a transfer \
-        to/from that account. Rejects transfer legs — use change_transfer_details instead.
+        to/from that account. Rejects transfer legs — use change_transfer_details instead — \
+        and splits — use change_split instead.
         """
     }
     var schema: JSONSchema {
